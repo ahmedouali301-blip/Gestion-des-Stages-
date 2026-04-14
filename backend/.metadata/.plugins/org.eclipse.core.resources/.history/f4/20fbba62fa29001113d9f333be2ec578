@@ -1,0 +1,5 @@
+package com.clinisys.repository;
+
+public interface UtilisateurRepository {
+
+}

@@ -1,0 +1,53 @@
+package com.clinisys.service;
+ 
+import com.clinisys.enums.Role;
+import com.clinisys.enums.StatutStage;
+import com.clinisys.repository.*;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+ 
+@Service
+@RequiredArgsConstructor
+public class DashboardService {
+ 
+    private final UtilisateurRepository utilisateurRepository;
+    private final StageRepository       stageRepository;
+    private final SprintRepository      sprintRepository;
+    private final EvaluationRepository  evaluationRepository;
+    private final ReunionRepository     reunionRepository;
+ 
+    public DashboardStats getStatsGlobales() {
+        DashboardStats stats = new DashboardStats();
+        stats.setNbUtilisateurs(utilisateurRepository.count());
+        stats.setNbStagiaires(utilisateurRepository.findByRole(Role.ROLE_STAGIAIRE).size());
+        stats.setNbEncadrants(utilisateurRepository.findByRole(Role.ROLE_ENCADRANT).size());
+        stats.setNbStagesEnCours(stageRepository.findByStatut(StatutStage.EN_COURS).size());
+        stats.setNbStagesValides(stageRepository.findByStatut(StatutStage.VALIDE).size());
+        stats.setNbReunions(reunionRepository.countByStatut("TERMINEE"));
+        stats.setMoyenneEvaluations(evaluationRepository.getMoyenneGenerale());
+        return stats;
+    }
+ 
+    public DashboardStats getStatsByEncadrant(Long encadrantId) {
+        DashboardStats stats = new DashboardStats();
+        stats.setNbStagiaires(stageRepository.findByEncadrantId(encadrantId).size());
+        stats.setNbStagesEnCours(
+            stageRepository.findByEncadrantId(encadrantId)
+                .stream().filter(s -> s.getStatut() == StatutStage.EN_COURS).count()
+        );
+        stats.setMoyenneEvaluations(evaluationRepository.getMoyenneGenerale());
+        return stats;
+    }
+ 
+    @Data
+    public static class DashboardStats {
+        private long   nbUtilisateurs;
+        private long   nbStagiaires;
+        private long   nbEncadrants;
+        private long   nbStagesEnCours;
+        private long   nbStagesValides;
+        private long   nbReunions;
+        private Double moyenneEvaluations;
+    }
+}

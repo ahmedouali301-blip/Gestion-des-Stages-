@@ -1,0 +1,5 @@
+package com.clinisys.entity;
+
+public class Stagiaire {
+
+}

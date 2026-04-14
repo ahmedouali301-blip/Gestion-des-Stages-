@@ -1,0 +1,5 @@
+package com.clinisys.controller;
+
+public class AuthController {
+
+}

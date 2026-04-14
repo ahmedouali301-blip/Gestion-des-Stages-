@@ -1,0 +1,73 @@
+package com.clinisys.service;
+ 
+import com.clinisys.dto.request.SprintRequest;
+import com.clinisys.entity.*;
+import com.clinisys.enums.StatutSprint;
+//import com.clinisys.enums.StatutTache;
+import com.clinisys.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import java.time.LocalDate;
+import java.util.List;
+ 
+@Service
+@RequiredArgsConstructor
+public class SprintService {
+ 
+    private final SprintRepository sprintRepository;
+    private final StageRepository stageRepository;
+    private final TacheRepository tacheRepository;
+ 
+    public Sprint creerSprint(SprintRequest request) {
+        Stage stage = stageRepository.findById(request.getStageId())
+                .orElseThrow(() -> new RuntimeException("Stage non trouvé"));
+ 
+        if (request.getDateFin().isBefore(request.getDateDebut())) {
+            throw new RuntimeException("La date de fin doit être après la date de début");
+        }
+ 
+        Sprint sprint = new Sprint();
+        sprint.setNom(request.getNom());
+        sprint.setNumero(request.getNumero());
+        sprint.setObjectifs(request.getObjectifs());
+        sprint.setDateDebut(request.getDateDebut());
+        sprint.setDateFin(request.getDateFin());
+        sprint.setLivrables(request.getLivrables());
+        sprint.setStatut(StatutSprint.PLANIFIE);
+        sprint.setStage(stage);
+ 
+        return sprintRepository.save(sprint);
+    }
+ 
+    public Sprint cloturerSprint(Long id, boolean force) {
+        Sprint sprint = sprintRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Sprint non trouvé"));
+ 
+        long totalTaches = tacheRepository.countBySprintId(id);
+        long tachesTerminees = tacheRepository.countTermineesBySprintId(id);
+ 
+        if (totalTaches > tachesTerminees && !force) {
+            throw new RuntimeException("SPRINT_INCOMPLET:" + tachesTerminees + "/" + totalTaches);
+        }
+ 
+        sprint.setStatut(totalTaches == tachesTerminees
+                ? StatutSprint.TERMINE
+                : StatutSprint.TERMINE_INCOMPLET);
+        sprint.setDateCloture(LocalDate.now());
+ 
+        return sprintRepository.save(sprint);
+    }
+ 
+    public Sprint recalculerAvancement(Long sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId).orElseThrow();
+        long total = tacheRepository.countBySprintId(sprintId);
+        long terminees = tacheRepository.countTermineesBySprintId(sprintId);
+ 
+        sprint.setTauxAvancement(total == 0 ? 0.0 : (double) terminees / total * 100);
+        return sprintRepository.save(sprint);
+    }
+ 
+    public List<Sprint> getSprintsByStage(Long stageId) {
+        return sprintRepository.findByStageIdOrderByNumero(stageId);
+    }
+}

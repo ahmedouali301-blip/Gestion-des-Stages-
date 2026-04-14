@@ -1,0 +1,17 @@
+package com.clinisys.dto.request;
+ 
+//import com.clinisys.enums.StatutTache;
+
+import lombok.Data;
+import java.time.LocalDate;
+
+import com.clinisys.enums.StatutSprint;
+ 
+@Data
+public class TacheUpdateRequest {
+    //private StatutTache statut;
+	private StatutSprint s ;
+    private String      commentaire;
+    private LocalDate   dateFin;
+    private Integer     duree;
+}

@@ -1,0 +1,11 @@
+# React
+node_modules/
+
+# Spring Boot
+target/
+
+# fichiers sensibles
+.env
+
+# logs
+*.log

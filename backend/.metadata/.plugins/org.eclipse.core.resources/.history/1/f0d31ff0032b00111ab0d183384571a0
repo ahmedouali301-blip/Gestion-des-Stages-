@@ -1,0 +1,38 @@
+package com.clinisys.controller;
+ 
+import com.clinisys.dto.request.SprintRequest;
+import com.clinisys.entity.Sprint;
+import com.clinisys.service.SprintService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+ 
+@RestController
+@RequestMapping("/api/sprints")
+@RequiredArgsConstructor
+public class SprintController {
+ 
+    private final SprintService sprintService;
+ 
+    @PostMapping
+    @PreAuthorize("hasRole('ENCADRANT')")
+    public ResponseEntity<Sprint> creerSprint(@Valid @RequestBody SprintRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(sprintService.creerSprint(request));
+    }
+ 
+    @GetMapping("/stage/{stageId}")
+    public ResponseEntity<List<Sprint>> getSprintsByStage(@PathVariable Long stageId) {
+        return ResponseEntity.ok(sprintService.getSprintsByStage(stageId));
+    }
+ 
+    @PutMapping("/{id}/cloturer")
+    @PreAuthorize("hasRole('ENCADRANT')")
+    public ResponseEntity<Sprint> cloturerSprint(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean force) {
+        return ResponseEntity.ok(sprintService.cloturerSprint(id, force));
+    }
+}

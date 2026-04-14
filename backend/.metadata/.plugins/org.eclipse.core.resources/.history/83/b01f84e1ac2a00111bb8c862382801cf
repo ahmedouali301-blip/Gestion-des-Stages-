@@ -1,0 +1,5 @@
+package com.clinisys.dto.response;
+
+public class UtilisateurResponse {
+
+}
