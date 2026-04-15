@@ -29,6 +29,7 @@ public class TacheSprint {
     private Stagiaire stagiaire;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "statut", length = 50)
     private StatutTache statut = StatutTache.A_FAIRE;
 
     private Integer duree;

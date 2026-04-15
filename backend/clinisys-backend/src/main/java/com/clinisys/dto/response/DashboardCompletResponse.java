@@ -14,6 +14,7 @@ public class DashboardCompletResponse {
     private long   nbStagesEnCours;
     private long   nbStagesValides;
     private long   nbStagesInterrompus;
+    private long   nbSujets;
     private long   nbReunionsTerminees;
     private Double moyenneEvaluations;
     private Double tauxAvancementGlobal;

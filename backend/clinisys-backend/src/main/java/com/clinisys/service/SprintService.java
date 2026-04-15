@@ -90,10 +90,15 @@ public class SprintService {
                 }
 
                 // A_FAIRE, EN_COURS, EN_ATTENTE_VALIDATION → déplacer vers le nouveau sprint
+                // 1. Marquer la tâche actuelle comme REPORTEE dans l'ancien sprint
+                ancienneTache.setStatut(StatutTache.REPORTEE);
+                tacheRepository.save(ancienneTache);
+
+                // 2. Créer la nouvelle occurrence dans le nouveau sprint
                 TacheSprint nouvelleTache = new TacheSprint();
                 nouvelleTache.setSprint(saved);
                 nouvelleTache.setTache(ancienneTache.getTache());
-                nouvelleTache.setStatut(StatutTache.A_FAIRE); // Remise à A_FAIRE
+                nouvelleTache.setStatut(StatutTache.REPORTEE); // On le met en REPORTER pour le nouveau cycle aussi
                 nouvelleTache.setEstimation(ancienneTache.getEstimation());
                 nouvelleTache.setStagiaire(ancienneTache.getStagiaire());
 

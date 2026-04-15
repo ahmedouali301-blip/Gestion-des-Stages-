@@ -40,12 +40,15 @@ public class TacheService {
         tache.setDateEcheance(req.getDateEcheance());
         tache.setStage(stage);
         Tache saved = tacheBaseRepository.save(tache);
-        
+
         // Notifications
         String msg = "Une nouvelle tâche a été créée pour votre stage : " + tache.getTitre();
-        if (stage.getStagiaire() != null) notificationService.envoyerNotification(stage.getStagiaire(), "Nouvelle Tâche", msg, "TACHE_CREEE", null);
-        if (stage.getStagiaire2() != null) notificationService.envoyerNotification(stage.getStagiaire2(), "Nouvelle Tâche", msg, "TACHE_CREEE", null);
-        if (stage.getEncadrant() != null) notificationService.envoyerNotification(stage.getEncadrant(), "Nouvelle Tâche", msg, "TACHE_CREEE", null);
+        if (stage.getStagiaire() != null)
+            notificationService.envoyerNotification(stage.getStagiaire(), "Nouvelle Tâche", msg, "TACHE_CREEE", null);
+        if (stage.getStagiaire2() != null)
+            notificationService.envoyerNotification(stage.getStagiaire2(), "Nouvelle Tâche", msg, "TACHE_CREEE", null);
+        if (stage.getEncadrant() != null)
+            notificationService.envoyerNotification(stage.getEncadrant(), "Nouvelle Tâche", msg, "TACHE_CREEE", null);
 
         return toTacheResponse(saved);
     }
@@ -86,12 +89,18 @@ public class TacheService {
         }
 
         sprintService.recalculerAvancement(sprintId);
-        
+
         // Notifications
         String msgNotif = "La tâche '" + tache.getTitre() + "' a été affectée au sprint " + sprint.getNom();
-        if (stage.getEncadrant() != null) notificationService.envoyerNotification(stage.getEncadrant(), "Tâche Affectée", msgNotif, "TACHE_AFFECTEE", null);
-        if (stage.getStagiaire() != null) notificationService.envoyerNotification(stage.getStagiaire(), "Tâche Affectée", msgNotif, "TACHE_AFFECTEE", null);
-        if (stage.getStagiaire2() != null) notificationService.envoyerNotification(stage.getStagiaire2(), "Tâche Affectée", msgNotif, "TACHE_AFFECTEE", null);
+        if (stage.getEncadrant() != null)
+            notificationService.envoyerNotification(stage.getEncadrant(), "Tâche Affectée", msgNotif, "TACHE_AFFECTEE",
+                    null);
+        if (stage.getStagiaire() != null)
+            notificationService.envoyerNotification(stage.getStagiaire(), "Tâche Affectée", msgNotif, "TACHE_AFFECTEE",
+                    null);
+        if (stage.getStagiaire2() != null)
+            notificationService.envoyerNotification(stage.getStagiaire2(), "Tâche Affectée", msgNotif, "TACHE_AFFECTEE",
+                    null);
 
         return toSprintResponse(saved);
     }
@@ -135,13 +144,21 @@ public class TacheService {
         }
 
         sprintService.recalculerAvancement(sprint.getId());
-        mouvementService.enregistrer("Création d'une tâche : " + tache.getTitre() + " dans le sprint " + sprint.getNom(), "TACHE_CREEE", null);
-        
+        mouvementService.enregistrer(
+                "Création d'une tâche : " + tache.getTitre() + " dans le sprint " + sprint.getNom(), "TACHE_CREEE",
+                null);
+
         // Notif
         String msgNotif = "Nouvelle tâche dans le sprint " + sprint.getNom() + " : " + tache.getTitre();
-        if (stage != null && stage.getStagiaire() != null) notificationService.envoyerNotification(stage.getStagiaire(), "Nouvelle Tâche", msgNotif, "TACHE_CREEE", null);
-        if (stage != null && stage.getStagiaire2() != null) notificationService.envoyerNotification(stage.getStagiaire2(), "Nouvelle Tâche", msgNotif, "TACHE_CREEE", null);
-        if (stage != null && stage.getEncadrant() != null) notificationService.envoyerNotification(stage.getEncadrant(), "Nouvelle Tâche", msgNotif, "TACHE_CREEE", null);
+        if (stage != null && stage.getStagiaire() != null)
+            notificationService.envoyerNotification(stage.getStagiaire(), "Nouvelle Tâche", msgNotif, "TACHE_CREEE",
+                    null);
+        if (stage != null && stage.getStagiaire2() != null)
+            notificationService.envoyerNotification(stage.getStagiaire2(), "Nouvelle Tâche", msgNotif, "TACHE_CREEE",
+                    null);
+        if (stage != null && stage.getEncadrant() != null)
+            notificationService.envoyerNotification(stage.getEncadrant(), "Nouvelle Tâche", msgNotif, "TACHE_CREEE",
+                    null);
 
         return toSprintResponse(saved);
     }
@@ -170,13 +187,16 @@ public class TacheService {
         ts.setStagiaire(stagiaire);
         ts.setStatut(StatutTache.EN_ATTENTE_VALIDATION);
         TacheSprint savedTs = tacheRepository.save(ts);
-        mouvementService.enregistrer("Le stagiaire " + stagiaire.getNom() + " a proposé une tâche : " + tache.getTitre(), "TACHE_PROPOSEE", stagiaire);
-        
+        mouvementService.enregistrer(
+                "Le stagiaire " + stagiaire.getNom() + " a proposé une tâche : " + tache.getTitre(), "TACHE_PROPOSEE",
+                stagiaire);
+
         // Notif Encadrant
         Stage stage = sprint.getStage();
         if (stage != null && stage.getEncadrant() != null) {
-            notificationService.envoyerNotification(stage.getEncadrant(), "Proposition de Tâche", 
-                "Le stagiaire " + stagiaire.getNom() + " a proposé une nouvelle tâche : " + tache.getTitre(), "TACHE_PROPOSEE", null);
+            notificationService.envoyerNotification(stage.getEncadrant(), "Proposition de Tâche",
+                    "Le stagiaire " + stagiaire.getNom() + " a proposé une nouvelle tâche : " + tache.getTitre(),
+                    "TACHE_PROPOSEE", null);
         }
 
         return toSprintResponse(savedTs);
@@ -219,11 +239,15 @@ public class TacheService {
 
         sprintService.recalculerAvancement(ts.getSprint().getId());
         mouvementService.enregistrer("Validation de la tâche : " + ts.getTache().getTitre(), "TACHE_VALIDEE", null);
-        
+
         // Notif Stagiaires
         String msgValid = "Votre tâche '" + ts.getTache().getTitre() + "' a été validée par l'encadrant.";
-        if (stage.getStagiaire() != null) notificationService.envoyerNotification(stage.getStagiaire(), "Tâche Validée", msgValid, "TACHE_VALIDEE", null);
-        if (stage.getStagiaire2() != null) notificationService.envoyerNotification(stage.getStagiaire2(), "Tâche Validée", msgValid, "TACHE_VALIDEE", null);
+        if (stage.getStagiaire() != null)
+            notificationService.envoyerNotification(stage.getStagiaire(), "Tâche Validée", msgValid, "TACHE_VALIDEE",
+                    null);
+        if (stage.getStagiaire2() != null)
+            notificationService.envoyerNotification(stage.getStagiaire2(), "Tâche Validée", msgValid, "TACHE_VALIDEE",
+                    null);
 
         return toSprintResponse(saved);
     }
@@ -245,14 +269,17 @@ public class TacheService {
         TacheSprint ts = getTS(id);
         if (req.getStatut() != null) {
             verifierTransition(ts.getStatut(), req.getStatut());
-            
-            // ✅ Nouvelle condition : le stagiaire ne peut commencer une tâche que si le sprint est en cours
+
+            // ✅ Nouvelle condition : le stagiaire ne peut commencer une tâche que si le
+            // sprint est en cours
             if (req.getStatut() == StatutTache.EN_COURS) {
                 if (ts.getSprint() != null && ts.getSprint().getStatut() != StatutSprint.EN_COURS) {
-                    throw new RuntimeException("Impossible de commencer la tâche : l'encadrant doit d'abord démarrer le sprint '" + ts.getSprint().getNom() + "'.");
+                    throw new RuntimeException(
+                            "Impossible de commencer la tâche : l'encadrant doit d'abord démarrer le sprint '"
+                                    + ts.getSprint().getNom() + "'.");
                 }
             }
-            
+
             ts.setStatut(req.getStatut());
         }
         if (req.getCommentaire() != null)
@@ -263,14 +290,20 @@ public class TacheService {
             ts.setDuree(req.getDuree());
         TacheSprint saved = tacheRepository.save(ts);
         if (req.getStatut() != null) {
-            mouvementService.enregistrer("Mise à jour du statut de la tâche '" + ts.getTache().getTitre() + "' vers : " + req.getStatut(), "TACHE_STATUT_CHANGE", ts.getStagiaire());
-            
+            mouvementService.enregistrer(
+                    "Mise à jour du statut de la tâche '" + ts.getTache().getTitre() + "' vers : " + req.getStatut(),
+                    "TACHE_STATUT_CHANGE", ts.getStagiaire());
+
             // --- Notification Encadrant ---
             Stage stage = ts.getSprint().getStage();
             if (stage != null && stage.getEncadrant() != null) {
-                String stagiaireNom = (ts.getStagiaire() != null) ? ts.getStagiaire().getPrenom() + " " + ts.getStagiaire().getNom() : "Le stagiaire";
-                notificationService.envoyerNotification(stage.getEncadrant(), "Mise à jour de tâche", 
-                    stagiaireNom + " a changé le statut de la tâche '" + ts.getTache().getTitre() + "' en : " + req.getStatut(), "TACHE_STATUT_CHANGE", null);
+                String stagiaireNom = (ts.getStagiaire() != null)
+                        ? ts.getStagiaire().getPrenom() + " " + ts.getStagiaire().getNom()
+                        : "Le stagiaire";
+                notificationService.envoyerNotification(stage.getEncadrant(), "Mise à jour de tâche",
+                        stagiaireNom + " a changé le statut de la tâche '" + ts.getTache().getTitre() + "' en : "
+                                + req.getStatut(),
+                        "TACHE_STATUT_CHANGE", null);
             }
         }
 
@@ -315,8 +348,9 @@ public class TacheService {
     // ── Lister tâches d'un stage ──────────────────────────────
     public List<TacheResponse> getTachesByStage(Long stageId) {
         List<Tache> baseList = tacheBaseRepository.findByStageId(stageId);
-        
-        // Récupérer toutes les affectations de ce stage pour savoir lesquelles sont en sprint
+
+        // Récupérer toutes les affectations de ce stage pour savoir lesquelles sont en
+        // sprint
         List<TacheSprint> sprintTasks = tacheRepository.findByStageId(stageId);
         java.util.Map<Long, TacheSprint> sprintMap = sprintTasks.stream()
                 .collect(java.util.stream.Collectors.toMap(
@@ -393,6 +427,7 @@ public class TacheService {
             case A_FAIRE -> nouveau == StatutTache.EN_COURS;
             case EN_COURS -> nouveau == StatutTache.TERMINE || nouveau == StatutTache.A_FAIRE;
             case EN_ATTENTE_VALIDATION -> nouveau == StatutTache.A_FAIRE || nouveau == StatutTache.REFUSE;
+            case REPORTEE -> nouveau == StatutTache.EN_COURS || nouveau == StatutTache.TERMINE;
             default -> false;
         };
         if (!valid)
@@ -429,6 +464,7 @@ public class TacheService {
         r.setDateDebut(ts.getDateDebut());
         r.setDateFin(ts.getDateFin());
         if (ts.getTache() != null) {
+            r.setTacheId(ts.getTache().getId());
             r.setTitre(ts.getTache().getTitre());
             r.setDescription(ts.getTache().getDescription());
             r.setPriorite(ts.getTache().getPriorite());

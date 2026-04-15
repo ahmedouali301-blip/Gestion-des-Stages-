@@ -24,6 +24,7 @@ public class DashboardService {
     private final TacheRepository tacheRepository;
     private final StagiaireRepository stagiaireRepository;
     private final EncadrantRepository encadrantRepository;
+    private final SujetRepository sujetRepository;
 
     // ── Dashboard complet ─────────────────────────────────────
     public DashboardCompletResponse getDashboardComplet() {
@@ -42,6 +43,7 @@ public class DashboardService {
         r.setNbStagesEnCours(enCours);
         r.setNbStagesValides(valides);
         r.setNbStagesInterrompus(interrompus);
+        r.setNbSujets(sujetRepository.findAllDisponibles().size());
         r.setNbReunionsTerminees(reunionRepository.countByStatut("TERMINEE"));
         r.setMoyenneEvaluations(evaluationRepository.getMoyenneGenerale());
 
@@ -116,6 +118,7 @@ public class DashboardService {
         stats.setNbEncadrants(utilisateurRepository.findByRole(Role.ROLE_ENCADRANT).size());
         stats.setNbStagesEnCours(stageRepository.findByStatut(StatutStage.EN_COURS).size());
         stats.setNbStagesValides(stageRepository.findByStatut(StatutStage.VALIDE).size());
+        stats.setNbSujets(sujetRepository.findAllDisponibles().size());
         stats.setNbReunions(reunionRepository.countByStatut("TERMINEE"));
         stats.setMoyenneEvaluations(evaluationRepository.getMoyenneGenerale());
         return stats;
@@ -138,6 +141,7 @@ public class DashboardService {
         private long nbEncadrants;
         private long nbStagesEnCours;
         private long nbStagesValides;
+        private long nbSujets;
         private long nbReunions;
         private Double moyenneEvaluations;
     }

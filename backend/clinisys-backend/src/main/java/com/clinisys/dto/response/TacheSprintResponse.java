@@ -20,6 +20,7 @@ public class TacheSprintResponse {
     private Integer       duree;
     private String        commentaire;
     private LocalDateTime dateCreation;
+    private Long          tacheId;
     // Stagiaire assigné
     private Long   stagiaireId;
     private String stagiaireNom;

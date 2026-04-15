@@ -40,7 +40,7 @@ public class SprintController {
     }
  
     @PatchMapping("/{id}/cloturer")
-    @PreAuthorize("hasRole('ENCADRANT')")
+    @PreAuthorize("hasRole('ENCADRANT') or hasRole('RESPONSABLE')")
     public ResponseEntity<SprintResponse> cloturer(
             @PathVariable Long id,
             @RequestParam(defaultValue = "false") boolean force) {

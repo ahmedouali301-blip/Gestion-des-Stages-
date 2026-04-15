@@ -95,12 +95,15 @@ public class SujetService {
         }
 
         // --- Log & Notifs ---
-        mouvementService.enregistrer("Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom() + " a choisi le sujet : " + sujet.getTitre(), "SUJET_CHOISI", stagiaire);
-        
+        mouvementService.enregistrer("Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom()
+                + " a choisi le sujet : " + sujet.getTitre(), "SUJET_CHOISI", stagiaire);
+
         List<Utilisateur> responsables = utilisateurRepo.findByRole(com.clinisys.enums.Role.ROLE_RESPONSABLE_STAGE);
-        for(Utilisateur resp : responsables) {
-            notificationService.envoyerNotification(resp, "Nouveau choix de sujet", 
-                "Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom() + " a choisi le sujet : " + sujet.getTitre(), "SUJET_CHOISI", null);
+        for (Utilisateur resp : responsables) {
+            notificationService.envoyerNotification(resp, "Nouveau choix de sujet",
+                    "Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom() + " a choisi le sujet : "
+                            + sujet.getTitre(),
+                    "SUJET_CHOISI", null);
         }
 
         return toChoixResponse(saved);
@@ -119,12 +122,15 @@ public class SujetService {
 
         // --- Log & Notifs ---
         Stagiaire stagiaire = choix.getStagiaire();
-        mouvementService.enregistrer("Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom() + " a annulé son choix pour le sujet : " + sujet.getTitre(), "SUJET_ANNULE", stagiaire);
-        
+        mouvementService.enregistrer("Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom()
+                + " a annulé son choix pour le sujet : " + sujet.getTitre(), "SUJET_ANNULE", stagiaire);
+
         List<Utilisateur> responsables = utilisateurRepo.findByRole(com.clinisys.enums.Role.ROLE_RESPONSABLE_STAGE);
-        for(Utilisateur resp : responsables) {
-            notificationService.envoyerNotification(resp, "Annulation de choix de sujet", 
-                "Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom() + " a annulé son choix : " + sujet.getTitre(), "SUJET_ANNULE", null);
+        for (Utilisateur resp : responsables) {
+            notificationService.envoyerNotification(resp, "Annulation de choix de sujet",
+                    "Le stagiaire " + stagiaire.getPrenom() + " " + stagiaire.getNom() + " a annulé son choix : "
+                            + sujet.getTitre(),
+                    "SUJET_ANNULE", null);
         }
     }
 
