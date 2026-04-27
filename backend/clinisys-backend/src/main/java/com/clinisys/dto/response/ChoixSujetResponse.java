@@ -13,7 +13,9 @@ public class ChoixSujetResponse {
     private String sujetDescription;
     private String sujetType;
     private String sujetStatut;
+    private String sujetAnnee;
     private Long stagiaireId;
     private String stagiaireNom;
     private String stagiairePrenom;
+    private String stagiaireEmail;
 }

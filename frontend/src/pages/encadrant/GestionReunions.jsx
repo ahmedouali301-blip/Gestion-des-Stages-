@@ -16,20 +16,18 @@ import {
   reporterReunionEncadrant,
 } from "../../api/reunionAPI";
 import { getStagesByEncadrant } from "../../api/stageAPI";
-import { 
-  Calendar, Clock, MapPin, Search, 
-  Filter, Plus, CheckCircle, XCircle, 
-  FileText, Activity, Layers, Info, 
-  ChevronRight, ArrowRight, RefreshCw, 
-  Send, User, AlertCircle, Sparkles,
-  Trash2, Edit3, MessageSquare
+import {
+  Trash2, Edit3, MessageSquare,
+  LayoutDashboard, ClipboardList, FileText, Star, Send, AlertCircle, CheckCircle, Activity, XCircle, Clock, User, Sparkles, Info, Plus, Calendar, RefreshCw
 } from 'lucide-react';
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/encadrant/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/encadrant/stages", icon: "📋", label: "Mes stages" },
-  { path: "/encadrant/reunions", icon: "📅", label: "Réunions" },
-  { path: "/encadrant/evaluations", icon: "⭐", label: "Évaluations" },
+  { path: "/encadrant/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/encadrant/stages", icon: <ClipboardList size={18} />, label: "Mes stages" },
+  { path: "/encadrant/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/encadrant/reunions", icon: <Calendar size={18} />, label: "Réunions" },
+  { path: "/encadrant/evaluations", icon: <Star size={18} />, label: "Évaluations" },
 ];
 
 const STATUT_CONFIG = {
@@ -44,6 +42,7 @@ const STATUT_CONFIG = {
 export default function GestionReunions() {
   const { user } = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [reunions, setReunions] = useState([]);
   const [stages, setStages] = useState([]);
@@ -63,7 +62,8 @@ export default function GestionReunions() {
   
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (user?.id) loadAll(); }, [user]);
+  useEffect(() => { if (user?.id) loadAll(); }, [user, activeSession]);
+  useEffect(() => { setSelected(null); }, [activeSession]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -133,7 +133,33 @@ export default function GestionReunions() {
     } catch {} finally { setSaving(false); }
   };
 
-  const filtered = filter === "TOUS" ? reunions : reunions.filter(r => r.statut === filter);
+  const filtered = (reunions || []).filter(r => {
+    if (filter !== "TOUS" && r.statut !== filter) return false;
+    if (!activeSession) return true;
+
+    const sessionStr = String(activeSession);
+
+    // 1. Vérification par l'année de la réunion elle-même
+    if (r.annee) {
+      return String(r.annee) === sessionStr;
+    }
+
+    // 2. Vérification par le stage parent
+    if (r.stageId) {
+      const parentStage = stages.find(s => Number(s.id) === Number(r.stageId));
+      if (parentStage && parentStage.annee) {
+        return String(parentStage.annee) === sessionStr;
+      }
+    }
+
+    // 3. Fallback par la date de la réunion
+    if (r.dateHeure) {
+       const meetingYear = new Date(r.dateHeure).getFullYear();
+       return String(meetingYear) === sessionStr;
+    }
+
+    return false;
+  });
 
   return (
     <div className={`app-layout ${sidebarMini ? "sidebar-mini" : ""}`}>
@@ -146,9 +172,11 @@ export default function GestionReunions() {
               <h1 className="gradient-text">Agenda Management</h1>
               <p>Pilotez vos sessions d'encadrement en temps réel</p>
            </div>
-           <button className="btn btn-primary elite-btn" onClick={() => setShowModal(true)}>
-              <Plus size={18} /> <span>Planifier une Session</span>
-           </button>
+           {stages.some(s => s.statut !== 'VALIDE') && (
+             <button className="btn btn-primary elite-btn" onClick={() => setShowModal(true)}>
+                <Plus size={18} /> <span>Planifier une Session</span>
+             </button>
+           )}
         </header>
 
         <div className="agenda-orchestration-v3">
@@ -258,35 +286,51 @@ export default function GestionReunions() {
                       </div>
 
                       <div className="session-actions-v3">
-                         {selected.statut === "REPORTEE_PAR_STAGIAIRE" && (
-                            <div className="primary-actions">
-                               <button className="btn btn-success elite-btn-full" onClick={() => handleDeciderReport(selected.id, true)}>Accepter Report</button>
-                               <button className="btn btn-outline" onClick={() => { setReportForm({ motif: selected.motifReport, nouvelleDate: selected.dateHeure }); setShowReportModal(true); }}>Reporter</button>
-                            </div>
-                         )}
+                          {(() => {
+                              const cStage = stages.find(s => Number(s.id) === Number(selected.stageId));
+                              const isLocked = cStage?.statut === 'VALIDE';
 
-                         {selected.statut === "PROPOSEE" && !selected.acceptationEncadrant && (
-                           <button className="btn btn-success elite-btn-full" onClick={() => handleAccepter(selected.id)}>Accepter Session</button>
-                         )}
+                             if (isLocked) {
+                                return <div className="locked-badge-v3"><CheckCircle size={14} /> SESSION SCELLÉE (STAGE VALIDÉ)</div>;
+                             }
 
-                         {selected.statut === "PLANIFIEE" && (
-                           <button className="btn btn-primary elite-btn-full" onClick={() => handleStatut(selected.id, "EN_COURS")}>Démarrer Session Live</button>
-                         )}
+                             return (
+                                <>
+                                   {selected.statut === "REPORTEE_PAR_STAGIAIRE" && (
+                                      <div className="primary-actions">
+                                         <button className="btn btn-success elite-btn-full" onClick={() => handleDeciderReport(selected.id, true)}>Accepter Report</button>
+                                         <button className="btn btn-outline" onClick={() => { setReportForm({ motif: selected.motifReport, nouvelleDate: selected.dateHeure }); setShowReportModal(true); }}>Reporter</button>
+                                      </div>
+                                   )}
 
-                         {selected.statut === "EN_COURS" && (
-                           <button className="btn btn-primary elite-btn-full" onClick={() => { setNoteForm({ ...selected }); setShowNoteModal(true); }}>Rédiger Notes & PV</button>
-                         )}
+                                   {selected.statut === "PROPOSEE" && !selected.acceptationEncadrant && (
+                                     <button className="btn btn-success elite-btn-full" onClick={() => handleAccepter(selected.id)}>Accepter Session</button>
+                                   )}
 
-                         {(selected.statut === "PROPOSEE" || selected.statut === "PLANIFIEE") && (
-                           <button className="btn btn-outline full-width mt-2" onClick={() => { setReportForm({ motif:"", nouvelleDate: selected.dateHeure }); setShowReportModal(true); }}>
-                              Reprogrammer Session
-                           </button>
-                         )}
+                                   {selected.statut === "PLANIFIEE" && (
+                                     <button className="btn btn-primary elite-btn-full" onClick={() => handleStatut(selected.id, "EN_COURS")}>Démarrer Session Live</button>
+                                   )}
 
-                         <button className="btn-cancel-link" onClick={() => { if(window.confirm("Supprimer cette réunion ?")) deleteReunion(selected.id).then(loadAll); }}>
-                            Supprimer de l'Agenda
-                         </button>
-                      </div>
+                                    {selected.statut === "EN_COURS" && (
+                                      <button className="btn btn-primary elite-btn-full" onClick={() => { 
+                                        setNoteForm({ 
+                                          observations: selected.observations || "", 
+                                          recommandations: selected.recommandations || "" 
+                                        }); 
+                                        setShowNoteModal(true); 
+                                      }}>Rédiger Notes & PV</button>
+                                    )}
+
+                                   {(selected.statut === "PROPOSEE" || selected.statut === "PLANIFIEE") && (
+                                     <button className="btn btn-outline full-width mt-2" onClick={() => { setReportForm({ motif:"", nouvelleDate: selected.dateHeure }); setShowReportModal(true); }}>
+                                        Reprogrammer Session
+                                     </button>
+                                   )}
+
+                                </>
+                             );
+                          })()}
+                       </div>
                    </motion.div>
                  ) : (
                    <div className="session-placeholder-v3">
@@ -316,7 +360,9 @@ export default function GestionReunions() {
                          <label>Dossier de Stage</label>
                          <select value={form.stageId} onChange={e => setForm({...form, stageId: e.target.value})} required>
                             <option value="">Sélectionner le stagiaire...</option>
-                            {stages.map(s => <option key={s.id} value={s.id}>{s.sujet} ({s.stagiaireNom})</option>)}
+                            {stages
+                               .filter(s => s.statut !== 'VALIDE' && (!s.annee || s.annee === activeSession))
+                               .map(s => <option key={s.id} value={s.id}>{s.sujet} ({s.stagiaireNom})</option>)}
                          </select>
                       </div>
                       <div className="grid-2">
@@ -378,7 +424,14 @@ export default function GestionReunions() {
                          <textarea value={noteForm.recommandations} onChange={e => setNoteForm({...noteForm, recommandations: e.target.value})} rows={4} />
                       </div>
                       <div className="modal-actions-v3">
-                         <button type="button" className="btn btn-ghost" onClick={() => { setShowNoteModal(false); setPvForm({ contenu: noteForm.observations, actionsCorrectives: noteForm.recommandations }); setShowPvModal(true); }}>Rédiger le PV</button>
+                         <button type="button" className="btn btn-ghost" onClick={() => { 
+                           setShowNoteModal(false); 
+                           setPvForm({ 
+                             contenu: noteForm.observations || "", 
+                             actionsCorrectives: noteForm.recommandations || "" 
+                           }); 
+                           setShowPvModal(true); 
+                         }}>Rédiger le PV</button>
                          <button type="submit" className="btn btn-primary elite-btn" disabled={saving}>Sauvegarder</button>
                       </div>
                    </form>
@@ -476,6 +529,7 @@ export default function GestionReunions() {
         }
         .modal-actions-v3 { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
         .btn-ghost { background: none; border: none; color: var(--text-3); font-weight: 700; cursor: pointer; }
+        .locked-badge-v3 { display: flex; align-items: center; gap: 8px; padding: 14px; background: var(--bg-alpha); color: var(--text-3); border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 0.5px; border: 1.5px solid var(--border); justify-content: center; }
       ` }} />
     </div>
   );

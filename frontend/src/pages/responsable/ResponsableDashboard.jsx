@@ -5,18 +5,18 @@ import Sidebar from "../../components/common/Sidebar";
 import { getDashboardComplet, exporterRapportGlobal, telechargerPdf } from "../../api/dashboardAPI";
 import Topbar from "../../components/common/Topbar";
 import { useTheme } from "../../context/ThemeContext";
-import { 
-  Users, 
-  UserCheck, 
-  GraduationCap, 
-  Briefcase, 
-  Calendar, 
-  Star, 
-  Zap, 
-  BarChart, 
-  TrendingUp, 
-  FileDown, 
-  PieChart, 
+import {
+  Users,
+  UserCheck,
+  GraduationCap,
+  Briefcase,
+  Calendar,
+  Star,
+  Zap,
+  BarChart,
+  TrendingUp,
+  FileDown,
+  PieChart,
   Activity,
   Award,
   BookOpen,
@@ -25,15 +25,18 @@ import {
   ChevronRight,
   UserPlus,
   ClipboardList,
-  Target
+  Target,
+  LayoutDashboard,
+  FileText
 } from 'lucide-react';
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/responsable/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/responsable/stages", icon: "📋", label: "Stages" },
-  { path: "/responsable/sujets", icon: "📝", label: "Sujets" },
-  { path: "/responsable/stagiaires", icon: "🎓", label: "Stagiaires" },
-  { path: "/responsable/analytique", icon: "📊", label: "Analytique" },
+  { path: "/responsable/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/responsable/stages", icon: <ClipboardList size={18} />, label: "Stages" },
+  { path: "/responsable/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/responsable/stagiaires", icon: <GraduationCap size={18} />, label: "Stagiaires" },
+  { path: "/responsable/analytique", icon: <BarChart size={18} />, label: "Analytique" },
 ];
 
 function StatCard({ icon: Icon, label, value, color, delay, onClick, subtext, trend }) {
@@ -45,7 +48,7 @@ function StatCard({ icon: Icon, label, value, color, delay, onClick, subtext, tr
       whileHover={{ y: -5, boxShadow: 'var(--shadow-lg)' }}
       className="premium-card"
       onClick={onClick}
-      style={{ 
+      style={{
         cursor: onClick ? "pointer" : "default",
         padding: '24px',
         display: 'flex',
@@ -55,10 +58,10 @@ function StatCard({ icon: Icon, label, value, color, delay, onClick, subtext, tr
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ 
-          width: 48, height: 48, 
-          borderRadius: 14, 
-          background: `${color}1A`, 
+        <div style={{
+          width: 48, height: 48,
+          borderRadius: 14,
+          background: `${color}1A`,
           color: color,
           display: 'flex',
           alignItems: 'center',
@@ -81,12 +84,12 @@ function StatCard({ icon: Icon, label, value, color, delay, onClick, subtext, tr
         {subtext && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{subtext}</div>}
       </div>
 
-      <div style={{ 
-        position: 'absolute', 
-        top: -20, 
-        right: -20, 
-        fontSize: 100, 
-        opacity: 0.03, 
+      <div style={{
+        position: 'absolute',
+        top: -20,
+        right: -20,
+        fontSize: 100,
+        opacity: 0.03,
         color: color,
         pointerEvents: 'none'
       }}>
@@ -101,14 +104,16 @@ const ResponsableDashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
-    getDashboardComplet()
+    setLoading(true);
+    getDashboardComplet(activeSession)
       .then((r) => setStats(r.data))
       .catch(() => { })
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeSession]);
 
   const handleExport = async () => {
     try {
@@ -128,7 +133,7 @@ const ResponsableDashboard = () => {
     <div className={`app-layout ${sidebarMini ? "sidebar-mini" : ""}`}>
       <Sidebar navItems={NAV} />
       <Topbar />
-      
+
       <main className="main-content fade-in" style={{ padding: '40px 48px' }}>
         {/* Elite Header section */}
         <section style={{ marginBottom: 40 }}>
@@ -142,20 +147,20 @@ const ResponsableDashboard = () => {
                 Centre de <span className="gradient-text">Contrôle</span>
               </h1>
             </motion.div>
-            
+
             <div style={{ display: 'flex', gap: 12 }}>
-              <motion.button 
+              <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={handleExport}
-                className="btn btn-outline" 
+                className="btn btn-outline"
                 style={{ borderRadius: 14, padding: '12px 20px', gap: 10 }}
               >
                 <FileDown size={18} /> Export Analytique
               </motion.button>
-              <motion.button 
+              <motion.button
                 whileHover={{ scale: 1.02, boxShadow: '0 10px 30px var(--primary-lt)' }} whileTap={{ scale: 0.98 }}
                 onClick={() => navigate("/responsable/stages")}
-                className="btn btn-primary" 
+                className="btn btn-primary"
                 style={{ borderRadius: 14, padding: '12px 24px', gap: 10, boxShadow: 'var(--shadow-md)' }}
               >
                 <ClipboardList size={18} /> Gérer les Stages
@@ -166,7 +171,7 @@ const ResponsableDashboard = () => {
         </section>
 
         {/* Top metrics grid */}
-        <motion.div 
+        <motion.div
           variants={containerVariants} initial="hidden" animate="visible"
           className="stats-grid"
           style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, marginBottom: 32 }}
@@ -212,7 +217,7 @@ const ResponsableDashboard = () => {
         {/* Analytics Section */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 32, marginBottom: 32 }}>
           {/* Main Analytics Card */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.5 }}
             className="premium-card" style={{ padding: 40 }}
           >
@@ -232,7 +237,7 @@ const ResponsableDashboard = () => {
                     <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--primary)' }}>{Math.round(stats?.tauxAvancementGlobal || 0)}%</span>
                   </div>
                   <div style={{ width: '100%', height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }} animate={{ width: `${stats?.tauxAvancementGlobal || 0}%` }}
                       transition={{ duration: 1, delay: 0.8 }}
                       style={{ height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent))' }}
@@ -246,7 +251,7 @@ const ResponsableDashboard = () => {
                     <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--success)' }}>{Math.round(stats?.tauxReussitePromotion || 0)}%</span>
                   </div>
                   <div style={{ width: '100%', height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }} animate={{ width: `${stats?.tauxReussitePromotion || 0}%` }}
                       transition={{ duration: 1, delay: 1 }}
                       style={{ height: '100%', background: 'var(--success)' }}
@@ -261,34 +266,34 @@ const ResponsableDashboard = () => {
                   {stats?.repartitionStatutStages && Object.entries(stats.repartitionStatutStages).map(([key, val], idx) => (
                     <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: idx % 2 === 0 ? 'var(--primary)' : 'var(--accent)' }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', flex: 1 }}>{key.replace('_',' ')}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', flex: 1 }}>{key.replace('_', ' ')}</span>
                       <span style={{ fontSize: 12, fontWeight: 800 }}>{val}</span>
                     </div>
                   ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                   <div style={{ position: 'relative', width: 100, height: 100 }}>
-                      <svg width="100" height="100" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="var(--border)" strokeWidth="3" />
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="var(--primary)" strokeWidth="3" 
-                          strokeDasharray={`${stats?.tauxAvancementGlobal || 0}, 100`} strokeLinecap="round" transform="rotate(-90 18 18)" />
-                      </svg>
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900 }}>
-                        {Math.round(stats?.tauxAvancementGlobal || 0)}%
-                      </div>
-                   </div>
+                  <div style={{ position: 'relative', width: 100, height: 100 }}>
+                    <svg width="100" height="100" viewBox="0 0 36 36">
+                      <circle cx="18" cy="18" r="16" fill="none" stroke="var(--border)" strokeWidth="3" />
+                      <circle cx="18" cy="18" r="16" fill="none" stroke="var(--primary)" strokeWidth="3"
+                        strokeDasharray={`${stats?.tauxAvancementGlobal || 0}, 100`} strokeLinecap="round" transform="rotate(-90 18 18)" />
+                    </svg>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900 }}>
+                      {Math.round(stats?.tauxAvancementGlobal || 0)}%
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </motion.div>
 
           {/* Quick Actions Card */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}
             className="premium-card" style={{ padding: 40, background: 'linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%)' }}
           >
             <h3 style={{ fontSize: 20, fontWeight: 900, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Zap size={20} className="gradient-text" /> 
+              <Zap size={20} className="gradient-text" />
               Actions Prioritaires
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -300,8 +305,8 @@ const ResponsableDashboard = () => {
                 <motion.button
                   key={i} whileHover={{ x: 6, background: 'var(--surface)' }}
                   onClick={() => navigate(item.path)}
-                  style={{ 
-                    display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', 
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px',
                     borderRadius: 16, background: 'transparent', border: '1px solid var(--border)',
                     textAlign: 'left', width: '100%', cursor: 'pointer', transition: 'all 0.2s'
                   }}
@@ -320,7 +325,7 @@ const ResponsableDashboard = () => {
         {/* Bottom Section: Leaders & Load */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
           {/* Top Stagiaires */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
             className="premium-card" style={{ padding: 0, overflow: 'hidden' }}
           >
@@ -330,7 +335,7 @@ const ResponsableDashboard = () => {
             </div>
             <div style={{ padding: '24px 40px' }}>
               {loading ? (
-                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Actualisation...</div>
+                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Actualisation...</div>
               ) : stats?.topStagiaires?.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   {stats.topStagiaires.map((s, idx) => (
@@ -355,7 +360,7 @@ const ResponsableDashboard = () => {
           </motion.div>
 
           {/* Encadrant Load */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}
             className="premium-card" style={{ padding: 0, overflow: 'hidden' }}
           >
@@ -364,22 +369,22 @@ const ResponsableDashboard = () => {
               <BarChart size={18} color="var(--text-3)" />
             </div>
             <div style={{ padding: '24px 40px' }}>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                  {stats?.chargeEncadrants?.slice(0, 4).map(e => (
-                    <div key={e.encadrantId}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700 }}>{e.encadrantPrenom} {e.encadrantNom}</span>
-                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{e.nbStagiaires} actifs</span>
-                      </div>
-                      <div style={{ width: '100%', height: 6, background: 'var(--bg)', borderRadius: 10, overflow: 'hidden' }}>
-                        <motion.div 
-                          initial={{ width: 0 }} animate={{ width: `${(e.nbStagiaires / 10) * 100}%` }}
-                          style={{ height: '100%', background: e.nbStagiaires > 7 ? 'var(--danger)' : 'var(--primary)', borderRadius: 10 }}
-                        />
-                      </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {stats?.chargeEncadrants?.slice(0, 4).map(e => (
+                  <div key={e.encadrantId}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{e.encadrantPrenom} {e.encadrantNom}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{e.nbStagiaires} actifs</span>
                     </div>
-                  ))}
-               </div>
+                    <div style={{ width: '100%', height: 6, background: 'var(--bg)', borderRadius: 10, overflow: 'hidden' }}>
+                      <motion.div
+                        initial={{ width: 0 }} animate={{ width: `${(e.nbStagiaires / 10) * 100}%` }}
+                        style={{ height: '100%', background: e.nbStagiaires > 7 ? 'var(--danger)' : 'var(--primary)', borderRadius: 10 }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </motion.div>
         </div>

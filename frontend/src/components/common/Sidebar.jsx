@@ -5,6 +5,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getRoleLabel } from "../../utils/roleHelpers";
 
+import { User, Power } from "lucide-react";
+
 export default function Sidebar({ navItems }) {
   const { user, logout } = useAuth();
   const { sidebarMini } = useTheme();
@@ -42,7 +44,7 @@ export default function Sidebar({ navItems }) {
             style={{ overflow: "hidden" }}
           >
             <div className="login-brand-text" style={{ fontSize: '18px', letterSpacing: '1px' }}>
-                <span className="brand-clini">CLINI</span><span className="brand-sys">SYS</span>
+              <span className="brand-clini">CLINI</span><span className="brand-sys">SYS</span>
             </div>
             <span style={{ fontSize: 9, letterSpacing: '0.5px', color: 'var(--text-3)', fontWeight: 600 }}>GESTION DE STAGES</span>
           </motion.div>
@@ -97,7 +99,7 @@ export default function Sidebar({ navItems }) {
           onClick={() => navigate(getProfilPath())}
           style={{ borderRadius: 14, padding: '12px 14px' }}
         >
-          <span className="nav-icon">👤</span>
+          <span className="nav-icon" style={{ fontSize: 18 }}><User size={18} /></span>
           <span className="nav-label" style={{ fontWeight: 600 }}>Mon profil</span>
         </motion.div>
       </nav>
@@ -129,9 +131,9 @@ export default function Sidebar({ navItems }) {
             className="btn-logout"
             onClick={handleLogout}
             title="Déconnexion"
-            style={{ padding: '8px', borderRadius: '50%' }}
+            style={{ padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ⏻
+            <Power size={16} />
           </button>
         </div>
       </div>

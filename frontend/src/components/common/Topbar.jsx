@@ -16,15 +16,17 @@ import {
   Trash2, 
   Calendar, 
   ClipboardList, 
-  UserPlus, 
   CheckCircle, 
   AlertCircle,
   FileText,
-  UserCheck
+  UserCheck,
+  ChevronDown
 } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import ConfirmModal from "./ConfirmModal";
+import ClinisysAlert from "../../utils/SwalUtils";
+
+import { useSession } from "../../context/SessionContext";
 
 const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -32,13 +34,15 @@ const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", 
 export default function Topbar() {
   const { user } = useAuth();
   const { isDark, toggleTheme, toggleSidebar } = useTheme();
+  const { activeSession, changeSession } = useSession();
   const navigate = useNavigate();
   const [now, setNow] = useState(new Date());
   const [notifs, setNotifs] = useState([]);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
-  const [confirm, setConfirm] = useState({ isOpen: false, title: '', message: '', type: 'primary', onConfirm: () => {} });
 
-  const closeConfirm = () => setConfirm(prev => ({ ...prev, isOpen: false }));
+  const currentYearNum = new Date().getFullYear();
+  const years = Array.from({ length: 11 }, (_, i) => (currentYearNum - 10 + i).toString());
+  const [showSessionMenu, setShowSessionMenu] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -106,19 +110,18 @@ export default function Topbar() {
 
   const handleDeleteAll = () => {
     if (!user?.id) return;
-    setConfirm({
-      isOpen: true,
+    ClinisysAlert.confirm({
       title: 'Vider les notifications',
-      message: 'Voulez-vous supprimer toutes vos notifications ?',
-      type: 'danger',
-      onConfirm: async () => {
+      text: 'Voulez-vous supprimer toutes vos notifications ?',
+      confirmText: 'Supprimer',
+      danger: true
+    }).then(async (result) => {
+      if (result.isConfirmed) {
         try {
           await supprimerToutNotifs(user.id);
           loadNotifs();
-          closeConfirm();
-        } catch (err) {
-          closeConfirm();
-        }
+          ClinisysAlert.success("Notifications supprimées");
+        } catch (err) {}
       }
     });
   };
@@ -149,6 +152,103 @@ export default function Topbar() {
         <div className="topbar-datetime" style={{ marginLeft: 8 }}>
           <span className="topbar-date" style={{ color: 'var(--text-3)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{dateStr}</span>
           <span className="topbar-time" style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{timeStr}</span>
+        </div>
+
+        <div className="session-selector-premium" style={{ marginLeft: 32, position: 'relative' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 9, fontWeight: 900, color: 'var(--text-3)', letterSpacing: 1.5, opacity: 0.8, marginBottom: 4 }}>SESSION ACADÉMIQUE</span>
+            
+            <motion.div 
+              className="session-trigger"
+              onClick={() => setShowSessionMenu(!showSessionMenu)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                padding: '6px 14px',
+                borderRadius: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                cursor: 'pointer',
+                boxShadow: 'var(--shadow-sm)',
+                minWidth: 100,
+                justifyContent: 'space-between'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Calendar size={14} className="text-primary" />
+                <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--primary)' }}>{activeSession}</span>
+              </div>
+              <motion.div
+                animate={{ rotate: showSessionMenu ? 180 : 0 }}
+                transition={{ duration: 0.3 }}
+                style={{ display: 'flex', color: 'var(--text-3)' }}
+              >
+                <ChevronDown size={14} />
+              </motion.div>
+            </motion.div>
+          </div>
+
+          <AnimatePresence>
+            {showSessionMenu && (
+              <>
+                <div 
+                  style={{ position: 'fixed', inset: 0, zIndex: 1050 }} 
+                  onClick={() => setShowSessionMenu(false)} 
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: 10,
+                    width: 140,
+                    background: 'var(--surface)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 16,
+                    padding: 8,
+                    zIndex: 1100,
+                    boxShadow: 'var(--shadow-lg)',
+                    maxHeight: 280,
+                    overflowY: 'auto'
+                  }}
+                  className="custom-scrollbar"
+                >
+                  {years.map(y => (
+                    <motion.div
+                      key={y}
+                      whileHover={{ x: 4, background: 'var(--primary-lt)' }}
+                      onClick={() => {
+                        changeSession(y);
+                        setShowSessionMenu(false);
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: y === activeSession ? 800 : 600,
+                        color: y === activeSession ? 'var(--primary)' : 'var(--text-2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: '0.2s'
+                      }}
+                    >
+                      {y}
+                      {y === activeSession && <Check size={12} />}
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -431,14 +531,7 @@ export default function Topbar() {
         </motion.div>
       </div>
 
-      <ConfirmModal
-        isOpen={confirm.isOpen}
-        title={confirm.title}
-        message={confirm.message}
-        onClose={closeConfirm}
-        onConfirm={confirm.onConfirm}
-        type={confirm.type}
-      />
+      <div style={{ visibility: 'hidden', height: 0 }}></div>
     </div>
   );
 }

@@ -8,7 +8,4 @@ import java.util.List;
 
 public interface SujetRepository extends JpaRepository<Sujet, Long> {
     List<Sujet> findByResponsableId(Long responsableId);
-
-    @Query("SELECT s FROM Sujet s WHERE s.statut = 'DISPONIBLE'")
-    List<Sujet> findAllDisponibles();
 }

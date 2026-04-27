@@ -16,19 +16,19 @@ import {
 } from "../../api/tacheAPI";
 import { getStageById } from "../../api/stageAPI";
 import { getSprintsByStage } from "../../api/sprintAPI";
-import ConfirmModal from "../../components/common/ConfirmModal";
-import { 
-  CheckSquare, Plus, Layers, Target, 
-  Trash2, ChevronLeft, Search, Filter, 
-  Clock, AlertCircle, CheckCircle, ArrowRight,
-  TrendingUp, Activity, Briefcase, RefreshCw
+import {
+  TrendingUp, Activity, Briefcase, RefreshCw, Play,
+  LayoutDashboard, ClipboardList, FileText, Star, Calendar, ChevronLeft, CheckCircle, AlertCircle, Trash2, Clock, Target, Layers, Plus, Info
 } from 'lucide-react';
+import ClinisysAlert from "../../utils/SwalUtils";
+import Swal from 'sweetalert2';
 
 const NAV = [
-  { path: "/encadrant/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/encadrant/stages", icon: "📋", label: "Mes stages" },
-  { path: "/encadrant/reunions", icon: "📅", label: "Réunions" },
-  { path: "/encadrant/evaluations", icon: "⭐", label: "Évaluations" },
+  { path: "/encadrant/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/encadrant/stages", icon: <ClipboardList size={18} />, label: "Mes stages" },
+  { path: "/encadrant/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/encadrant/reunions", icon: <Calendar size={18} />, label: "Réunions" },
+  { path: "/encadrant/evaluations", icon: <Star size={18} />, label: "Évaluations" },
 ];
 
 const PRIORITE_CONFIG = {
@@ -44,9 +44,29 @@ const STATUT_CONFIG = {
   EN_COURS: { label: "En Cours", color: "#6366f1", bg: "rgba(99,102,241,0.1)", icon: Activity },
   TERMINE: { label: "Terminé", color: "#10b981", bg: "rgba(16,185,129,0.1)", icon: CheckCircle },
   REFUSE: { label: "Refusé", color: "#ef4444", bg: "rgba(239,68,68,0.1)", icon: AlertCircle },
+  REPORTEE: { label: "Reporter", color: "#f59e0b", bg: "rgba(245,158,11,0.1)", icon: RefreshCw },
 };
 
 const EMPTY = { titre: "", description: "", priorite: "MOYENNE", dateEcheance: "", estimation: "" };
+
+const deduplicateTaches = (taches) => {
+  const map = new Map();
+  taches.forEach(t => {
+    const key = t.tacheId || t.titre;
+    if (map.has(key)) {
+      const existing = map.get(key);
+      if (t.stagiairePrenom) {
+        const nomComplet = `${t.stagiairePrenom} ${t.stagiaireNom}`;
+        if (existing.stagiairesNoms && !existing.stagiairesNoms.includes(nomComplet)) {
+          existing.stagiairesNoms.push(nomComplet);
+        }
+      }
+    } else {
+      map.set(key, { ...t, stagiairesNoms: t.stagiairePrenom ? [`${t.stagiairePrenom} ${t.stagiaireNom}`] : [] });
+    }
+  });
+  return Array.from(map.values());
+};
 
 export default function GestionTaches() {
   const { stageId } = useParams();
@@ -65,9 +85,7 @@ export default function GestionTaches() {
   const [onglet, setOnglet] = useState("toutes");
   const [sprintSelec, setSprintSelec] = useState(null);
 
-  const [confirm, setConfirm] = useState({ isOpen: false, title: "", message: "", confirmText: "Confirmer", type: "primary", onConfirm: () => {} });
 
-  const closeConfirm = () => setConfirm((p) => ({ ...p, isOpen: false }));
 
   useEffect(() => { loadAll(); }, [stageId]);
 
@@ -86,7 +104,7 @@ export default function GestionTaches() {
     setSprintSelec(sprint);
     try {
       const { data } = await getTachesBySprint(sprint.id);
-      setTachesSprint(data);
+      setTachesSprint(deduplicateTaches(data));
     } catch {}
   };
 
@@ -95,7 +113,8 @@ export default function GestionTaches() {
     try {
       await creerTachePourStage({ ...form, estimation: form.estimation ? Number(form.estimation) : null, stageId: Number(stageId) });
       setShowModal(false); setForm(EMPTY); loadAll();
-    } catch (err) { setError(err.response?.data?.message || "Erreur création."); }
+      ClinisysAlert.success("Tâche créée");
+    } catch (err) { ClinisysAlert.error("Erreur", err.response?.data?.message || "Erreur création."); }
     finally { setSaving(false); }
   };
 
@@ -120,9 +139,14 @@ export default function GestionTaches() {
               <button className="btn btn-outline elite-btn-ghost" onClick={() => navigate(`/encadrant/sprints/${stageId}`)}>
                  <RefreshCw size={18} /> <span>Sprint Orbit</span>
               </button>
-              <button className="btn btn-primary elite-btn" onClick={() => { setShowModal(true); setForm(EMPTY); }}>
-                 <Plus size={18} /> <span>New Task</span>
-              </button>
+              {stage?.statut !== 'VALIDE' && (
+                <button className="btn btn-primary elite-btn" onClick={() => { setShowModal(true); setForm(EMPTY); }}>
+                   <Plus size={18} /> <span>New Task</span>
+                </button>
+              )}
+              {stage?.statut === 'VALIDE' && (
+                <div className="locked-badge-v2"><Activity size={14} /> LECTURE SEULE</div>
+              )}
            </div>
         </header>
 
@@ -159,7 +183,13 @@ export default function GestionTaches() {
         ) : onglet === "toutes" ? (
           <div className="backlog-items-grid">
             {taches.length === 0 ? (
-              <div className="empty-backlog"><div className="icon-box"><Target size={48} /></div><h3>Backlog vierge</h3><p>Assignez des tâches techniques pour démarrer le projet.</p></div>
+              <div className="empty-backlog">
+                 <div className="icon-box">
+                    <div style={{ marginBottom: 24, opacity: 0.1 }}><Target size={48} /></div>
+                 </div>
+                 <h3>Backlog vierge</h3>
+                 <p>Assignez des tâches techniques pour démarrer le projet.</p>
+              </div>
             ) : (
               taches.map((t, idx) => {
                 const prio = PRIORITE_CONFIG[t.priorite] || PRIORITE_CONFIG.MOYENNE;
@@ -171,7 +201,17 @@ export default function GestionTaches() {
                            <h3>{t.titre}</h3>
                            <div className="prio-badge" style={{ color: prio.color, background: prio.bg }}>{prio.label}</div>
                         </div>
-                        <button className="card-delete-btn" onClick={() => deleteTacheSimple(t.id).then(loadAll)}><Trash2 size={16} /></button>
+                        {stage?.statut !== 'VALIDE' && !t.sprintNom && (
+                           <button className="card-delete-btn" onClick={() => ClinisysAlert.confirm({
+                              title: "Supprimer la tâche",
+                              text: "Voulez-vous supprimer définitivement cette tâche du backlog ? Cette action est irréversible.",
+                              confirmText: "Supprimer",
+                              danger: true
+                           }).then(res => res.isConfirmed && deleteTacheSimple(t.id).then(() => {
+                              loadAll();
+                              ClinisysAlert.success("Tâche supprimée du backlog");
+                           }))}><Trash2 size={16} /></button>
+                        )}
                      </div>
                      <p className="card-desc">{t.description || "Aucune spécification technique fournie."}</p>
                      <div className="card-footer-elite">
@@ -200,7 +240,7 @@ export default function GestionTaches() {
                         <div className="s-icon">#{s.numero}</div>
                         <div className="s-info">
                            <span className="name">{s.nom}</span>
-                           <span className="meta">{s.dateFin} • {s.nbTaches} tasks</span>
+                           <span className="meta">{s.dateFin} • {stage?.stagiaire2Id ? Math.ceil(s.nbTaches/2) : s.nbTaches} tasks</span>
                         </div>
                         <ChevronLeft size={16} className="chevron" />
                      </button>
@@ -239,14 +279,59 @@ export default function GestionTaches() {
                                   </div>
                                </div>
                                <div className="item-ops">
-                                  {t.statut === 'EN_ATTENTE_VALIDATION' && (
-                                    <>
-                                       <button className="op-btn check" onClick={() => validerTache(t.id).then(() => loadTachesSprint(sprintSelec))}><CheckCircle size={14} /></button>
-                                       <button className="op-btn refuse" onClick={() => { const r = prompt("Motif ?"); if(r) refuserTache(t.id, r).then(() => loadTachesSprint(sprintSelec)); }}><AlertCircle size={14} /></button>
-                                    </>
-                                  )}
-                                  {t.statut === 'A_FAIRE' && <button className="op-btn go" onClick={() => mettreAJourTache(t.id, {statut:'EN_COURS'}).then(() => loadTachesSprint(sprintSelec))}><Play size={14} /></button>}
-                                  <button className="op-btn del" onClick={() => deleteTache(t.id).then(() => loadTachesSprint(sprintSelec))}><Trash2 size={14} /></button>
+                                  {stage?.statut !== 'VALIDE' && (
+                                     <>
+                                        {t.statut === 'EN_ATTENTE_VALIDATION' && (
+                                          <>
+                                             <button className="op-btn check" onClick={() => validerTache(t.id).then(() => {
+                                                loadTachesSprint(sprintSelec);
+                                                ClinisysAlert.success("Tâche validée");
+                                             }).catch(() => ClinisysAlert.error("Erreur", "Validation impossible"))}><CheckCircle size={14} /></button>
+                                             <button className="op-btn refuse" onClick={async () => { 
+                                                const { value: r } = await Swal.fire({
+                                                   title: 'Refuser la tâche',
+                                                   input: 'text',
+                                                   inputLabel: 'Motif du refus',
+                                                   inputPlaceholder: 'Expliquez pourquoi...',
+                                                   showCancelButton: true,
+                                                   confirmButtonText: 'Refuser',
+                                                   cancelButtonText: 'Annuler',
+                                                   customClass: {
+                                                      popup: 'premium-swal-popup',
+                                                      confirmButton: 'premium-swal-confirm-danger',
+                                                      cancelButton: 'premium-swal-cancel',
+                                                      input: 'premium-swal-input'
+                                                   },
+                                                   buttonsStyling: false,
+                                                   inputValidator: (val) => !val && 'Le motif est obligatoire !'
+                                                });
+                                                if(r) refuserTache(t.id, r).then(() => {
+                                                   loadTachesSprint(sprintSelec);
+                                                   ClinisysAlert.success("Tâche refusée");
+                                                }); 
+                                             }}><AlertCircle size={14} /></button>
+                                          </>
+                                        )}
+                                        {t.statut === 'A_FAIRE' && <button className="op-btn go" onClick={() => mettreAJourTache(t.id, {statut:'EN_COURS'}).then(() => {
+                                           loadTachesSprint(sprintSelec);
+                                           ClinisysAlert.success("Tâche démarrée");
+                                        })}><Play size={14} /></button>}
+                                        {t.statut === 'A_FAIRE' && (
+                                          <button className="op-btn del" onClick={() => ClinisysAlert.confirm({
+                                             title: "Désaffecter la tâche",
+                                             text: "Voulez-vous retirer cette tâche du sprint ? Elle redeviendra disponible dans le backlog.",
+                                             confirmText: "Retirer du sprint",
+                                             danger: true
+                                          }).then(res => res.isConfirmed && deleteTache(t.id).then(() => {
+                                             loadTachesSprint(sprintSelec);
+                                             ClinisysAlert.success("Tâche retirée du sprint");
+                                          }))}><Trash2 size={14} /></button>
+                                        )}
+                                     </>
+                                   )}
+                                   {stage?.statut === 'VALIDE' && (
+                                     <div className="locked-small"><Target size={12} /></div>
+                                   )}
                                </div>
                             </div>
                           );
@@ -284,7 +369,15 @@ export default function GestionTaches() {
                         </div>
                         <div className="form-group-v3">
                            <label>Estimation (Jours)</label>
-                           <input type="number" step="0.5" value={form.estimation} onChange={f("estimation")} placeholder="Ex: 2.5" />
+                           <input 
+                             type="number" 
+                             step="1" 
+                             min="1"
+                             value={form.estimation} 
+                             onChange={f("estimation")} 
+                             onKeyPress={(e) => { if(!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                             placeholder="Ex: 2" 
+                           />
                         </div>
                      </div>
                      <div className="modal-footer-v3">
@@ -371,10 +464,12 @@ export default function GestionTaches() {
           .form-group-v3 input, .form-group-v3 select, .form-group-v3 textarea { width: 100%; padding: 14px 18px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--bg); font-size: 14px; font-weight: 700; outline: none; transition: 0.2s; }
           .form-group-v3 input:focus { border-color: var(--primary); background: #fff; }
           .modal-footer-v3 { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+          .locked-badge-v2 { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-alpha); color: var(--text-3); border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 1px; border: 1.5px solid var(--border); }
+          .locked-small { color: var(--text-3); opacity: 0.5; }
         ` }} />
       </main>
     </div>
   );
 }
 
-import { Play } from 'lucide-react';
+

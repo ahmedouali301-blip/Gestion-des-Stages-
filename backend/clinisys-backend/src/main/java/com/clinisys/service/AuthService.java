@@ -20,6 +20,9 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final UtilisateurRepository utilisateurRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
+    private final com.clinisys.repository.StagiaireIdentiteRepository identiteRepository;
+    private final EmailService emailService;
  
     public JwtResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
@@ -56,8 +59,33 @@ public class AuthService {
         }
  
         Utilisateur utilisateur = createUtilisateurByRole(request);
-        utilisateur.setMotDePasse(passwordEncoder.encode(request.getMotDePasse()));
-        utilisateurRepository.save(utilisateur);
+        // Le mot de passe par défaut est le CIN de l'utilisateur
+        utilisateur.setMotDePasse(passwordEncoder.encode(request.getCin()));
+        Utilisateur saved = utilisateurRepository.save(utilisateur);
+
+        // --- ENVOI EMAIL DE BIENVENUE ---
+        emailService.envoyerEmailBienvenue(
+            saved.getEmail(), 
+            saved.getNom(), 
+            saved.getPrenom(), 
+            saved.getEmail(), 
+            request.getCin()
+        );
+
+        // --- NOTIFICATION AU RESPONSABLE SI C'EST UN STAGIAIRE ---
+        if (request.getRole() == com.clinisys.enums.Role.ROLE_STAGIAIRE) {
+            identiteRepository.findByEmail(request.getEmail()).ifPresent(identite -> {
+                if (identite.getResponsable() != null) {
+                    notificationService.envoyerNotification(
+                        identite.getResponsable(),
+                        "Compte Stagiaire Activé",
+                        "L'administrateur a généré le compte pour " + identite.getPrenom() + " " + identite.getNom() + ". Il peut maintenant accéder à son espace.",
+                        "STAGE_COMPTE_OK",
+                        null
+                    );
+                }
+            });
+        }
     }
  
     private Utilisateur createUtilisateurByRole(RegisterRequest req) {

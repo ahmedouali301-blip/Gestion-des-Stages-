@@ -16,53 +16,76 @@ import java.util.List;
 public class SujetController {
     private final SujetService sujetService;
 
-    @GetMapping("/responsable/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ADMINISTRATEUR')")
-    public ResponseEntity<List<SujetResponse>> getByResponsable(@PathVariable Long id) {
-        return ResponseEntity.ok(sujetService.getByResponsable(id));
-    }
+    // --- Master Sujets (Bibliothèque) ---
 
-    @GetMapping("/disponibles")
-    @PreAuthorize("hasAuthority('ROLE_STAGIAIRE')")
-    public ResponseEntity<List<SujetResponse>> getDisponibles() {
-        return ResponseEntity.ok(sujetService.getDisponibles());
+    @GetMapping("/masters")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ADMINISTRATEUR','ROLE_ENCADRANT')")
+    public ResponseEntity<List<SujetResponse>> getAllMasters() {
+        return ResponseEntity.ok(sujetService.getAllMasters());
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_RESPONSABLE_STAGE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ENCADRANT')")
     public ResponseEntity<SujetResponse> creer(@Valid @RequestBody SujetRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(sujetService.creer(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_RESPONSABLE_STAGE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ENCADRANT')")
     public ResponseEntity<SujetResponse> modifier(@PathVariable Long id, @Valid @RequestBody SujetRequest req) {
         return ResponseEntity.ok(sujetService.modifier(id, req));
     }
 
-    @PatchMapping("/{id}/archiver")
-    @PreAuthorize("hasAuthority('ROLE_RESPONSABLE_STAGE')")
-    public ResponseEntity<SujetResponse> archiver(@PathVariable Long id) {
-        return ResponseEntity.ok(sujetService.archiver(id));
-    }
-
-    @PatchMapping("/{id}/valider")
-    @PreAuthorize("hasAuthority('ROLE_RESPONSABLE_STAGE')")
-    public ResponseEntity<SujetResponse> valider(@PathVariable Long id) {
-        return ResponseEntity.ok(sujetService.valider(id));
-    }
-
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_RESPONSABLE_STAGE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ENCADRANT')")
     public ResponseEntity<String> delete(@PathVariable Long id) {
         sujetService.delete(id);
-        return ResponseEntity.ok("Sujet supprimé");
+        return ResponseEntity.ok("Sujet Master supprimé");
     }
 
-    @PostMapping("/{sujetId}/choisir/{stagiaireId}")
+    // --- Sujet Sessions (Occurrences) ---
+
+    @GetMapping("/session/all")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ADMINISTRATEUR','ROLE_ENCADRANT')")
+    public ResponseEntity<List<SujetSessionResponse>> getAllSessions(@RequestParam String annee) {
+        return ResponseEntity.ok(sujetService.getSessionsByAnnee(annee));
+    }
+
+    @GetMapping("/disponibles")
     @PreAuthorize("hasAuthority('ROLE_STAGIAIRE')")
-    public ResponseEntity<ChoixSujetResponse> choisir(@PathVariable Long sujetId, @PathVariable Long stagiaireId) {
-        return ResponseEntity.ok(sujetService.choisirSujet(stagiaireId, sujetId));
+    public ResponseEntity<List<SujetSessionResponse>> getDisponiblesByAnnee(@RequestParam String annee) {
+        return ResponseEntity.ok(sujetService.getDisponiblesByAnnee(annee));
+    }
+
+    @PostMapping("/publier")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ENCADRANT')")
+    public ResponseEntity<SujetSessionResponse> publier(@Valid @RequestBody com.clinisys.dto.request.SujetSessionRequest req) {
+        return ResponseEntity.ok(sujetService.publier(req));
+    }
+
+    @DeleteMapping("/session/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ENCADRANT')")
+    public ResponseEntity<String> depublier(@PathVariable Long id) {
+        sujetService.depublier(id);
+        return ResponseEntity.ok("Publication annulée");
+    }
+
+    @PatchMapping("/session/{id}/valider")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ENCADRANT')")
+    public ResponseEntity<SujetSessionResponse> validerOccurrence(@PathVariable Long id) {
+        return ResponseEntity.ok(sujetService.validerOccurrence(id));
+    }
+
+    @PostMapping("/session/{sessionId}/choisir/{stagiaireId}")
+    @PreAuthorize("hasAuthority('ROLE_STAGIAIRE')")
+    public ResponseEntity<ChoixSujetResponse> choisir(@PathVariable Long sessionId, @PathVariable Long stagiaireId) {
+        return ResponseEntity.ok(sujetService.choisirSujet(stagiaireId, sessionId));
+    }
+
+    @GetMapping("/session/{sessionId}/choix")
+    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ADMINISTRATEUR','ROLE_ENCADRANT')")
+    public ResponseEntity<List<ChoixSujetResponse>> getChoixBySession(@PathVariable Long sessionId) {
+        return ResponseEntity.ok(sujetService.getChoixBySession(sessionId));
     }
 
     @DeleteMapping("/choix/{stagiaireId}")
@@ -76,18 +99,5 @@ public class SujetController {
     public ResponseEntity<ChoixSujetResponse> getChoix(@PathVariable Long stagiaireId) {
         ChoixSujetResponse r = sujetService.getChoixByStagiaire(stagiaireId);
         return r == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(r);
-    }
-
-    @GetMapping("/stagiaire/{stagiaireId}")
-    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ADMINISTRATEUR')")
-    public ResponseEntity<SujetResponse> getSujetDuStagiaire(@PathVariable Long stagiaireId) {
-        SujetResponse res = sujetService.getSujetDuStagiaire(stagiaireId);
-        return res != null ? ResponseEntity.ok(res) : ResponseEntity.notFound().build();
-    }
-
-    @GetMapping("/tous-les-choix")
-    @PreAuthorize("hasAnyAuthority('ROLE_RESPONSABLE_STAGE','ROLE_ADMINISTRATEUR')")
-    public ResponseEntity<List<ChoixSujetResponse>> getAllChoix() {
-        return ResponseEntity.ok(sujetService.getAllChoix());
     }
 }

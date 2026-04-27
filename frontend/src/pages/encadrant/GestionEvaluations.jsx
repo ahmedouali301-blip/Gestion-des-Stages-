@@ -11,17 +11,18 @@ import {
 } from "../../api/evaluationAPI";
 import { getStagesByEncadrant } from "../../api/stageAPI";
 import { getSprintsByStage } from "../../api/sprintAPI";
-import { 
-  Star, Target, Award, Laptop, 
-  Clock, Brain, MessageSquare, Save,
-  CheckCircle, AlertCircle, RefreshCw, ChevronLeft
+import { useSession } from "../../context/SessionContext";
+import {
+  CheckCircle, AlertCircle, RefreshCw, ChevronLeft, Calendar,
+  LayoutDashboard, ClipboardList, FileText, Target, Star, Save, Laptop, Clock, Brain, MessageSquare
 } from 'lucide-react';
 
 const NAV = [
-  { path: "/encadrant/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/encadrant/stages", icon: "📋", label: "Mes stages" },
-  { path: "/encadrant/reunions", icon: "📅", label: "Réunions" },
-  { path: "/encadrant/evaluations", icon: "⭐", label: "Évaluations" },
+  { path: "/encadrant/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/encadrant/stages", icon: <ClipboardList size={18} />, label: "Mes stages" },
+  { path: "/encadrant/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/encadrant/reunions", icon: <Calendar size={18} />, label: "Réunions" },
+  { path: "/encadrant/evaluations", icon: <Star size={18} />, label: "Évaluations" },
 ];
 
 const CRITERES = [
@@ -65,6 +66,7 @@ function EliteSlider({ label, icon: Icon, value, onChange, desc }) {
 const GestionEvaluations = () => {
   const { user } = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [stages, setStages] = useState([]);
   const [sprints, setSprints] = useState([]);
@@ -81,7 +83,12 @@ const GestionEvaluations = () => {
     if (user?.id) {
       getStagesByEncadrant(user.id).then((r) => setStages(r.data)).catch(() => {});
     }
-  }, [user]);
+    // Reset selection when session changes
+    setSelectedStage("");
+    setSelectedSprint(null);
+    setSprints([]);
+    setExistingEval(null);
+  }, [user, activeSession]);
 
   const handleStageChange = async (stageId) => {
     setSelectedStage(stageId);
@@ -89,6 +96,13 @@ const GestionEvaluations = () => {
     setSprints([]);
     setExistingEval(null);
     if (!stageId) return;
+
+    const stage = stages.find(s => s.id === Number(stageId));
+    if (stage && stage.statut === "VALIDE") {
+        // Si le stage est validé, on n'affiche plus les sprints pour évaluation
+        return;
+    }
+
     try {
       const { data } = await getSprintsByStage(stageId);
       setSprints(data.filter(s => s.statut === "TERMINE" || s.statut === "TERMINE_INCOMPLET"));
@@ -183,7 +197,9 @@ const GestionEvaluations = () => {
                     <label>Stagiaire Principal</label>
                     <select value={selectedStage} onChange={(e) => handleStageChange(e.target.value)}>
                        <option value="">Sélectionner un projet...</option>
-                       {stages.map((s) => (
+                       {stages
+                         .filter(s => !s.annee || s.annee === activeSession)
+                         .map((s) => (
                          <option key={s.id} value={s.id}>{s.sujet} ({s.stagiaireNom})</option>
                        ))}
                     </select>
@@ -209,6 +225,15 @@ const GestionEvaluations = () => {
                         ))}
                      </motion.div>
                    )}
+                   {selectedStage && sprints.length === 0 && stages.find(s => s.id === Number(selectedStage))?.statut === "VALIDE" && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="archived-eval-notice">
+                         <CheckCircle size={20} />
+                         <div className="notice-txt">
+                            <strong>Archives Finalisées</strong>
+                            <p>Toutes les évaluations de ce stage ont été scellées.</p>
+                         </div>
+                      </motion.div>
+                   )}
                  </AnimatePresence>
               </div>
            </div>
@@ -217,7 +242,9 @@ const GestionEvaluations = () => {
            <div className="form-panel">
               {!selectedSprint ? (
                 <div className="empty-selection-placeholder">
-                   <div className="placeholder-icon"><Star size={64} opacity={0.1} /></div>
+                   <div className="placeholder-icon">
+                      <div style={{ marginBottom: 24, opacity: 0.1 }}><Star size={64} /></div>
+                   </div>
                    <h3>Prêt à évaluer ?</h3>
                    <p>Veuillez sélectionner un projet et un sprint terminé sur la gauche pour commencer la notation.</p>
                 </div>
@@ -349,6 +376,9 @@ const GestionEvaluations = () => {
         .empty-selection-placeholder h3 { font-size: 22px; font-weight: 900; color: var(--text); margin-bottom: 12px; }
         .empty-selection-placeholder p { max-width: 400px; font-weight: 600; line-height: 1.5; }
         .loader-box { padding: 60px; text-align: center; color: var(--text-3); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .archived-eval-notice { margin-top: 32px; display: flex; align-items: center; gap: 16px; padding: 20px; background: rgba(16,185,129,0.1); border: 1.5px solid rgba(16,185,129,0.2); border-radius: 20px; color: #10b981; }
+        .notice-txt strong { display: block; font-size: 14px; font-weight: 900; }
+        .notice-txt p { font-size: 12px; font-weight: 600; opacity: 0.8; margin-top: 2px; line-height: 1.4; }
       ` }} />
     </div>
   );

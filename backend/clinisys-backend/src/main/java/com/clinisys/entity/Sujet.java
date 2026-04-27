@@ -24,14 +24,11 @@ public class Sujet {
     @Column(nullable = false)
     private TypeStage type;
     @Column(nullable = false)
-    private Integer nbMaxStagiaires = 1; // 1 ou 2
-    private String statut = "DISPONIBLE"; // DISPONIBLE, COMPLET, ARCHIVE
+    private Integer nbMaxStagiaires = 1;
     private LocalDateTime dateCreation;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "responsable_id")
-    private ResponsableStage responsable;
-    @OneToMany(mappedBy = "sujet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ChoixSujet> choix;
+    private Utilisateur responsable;
 
     @PrePersist
     public void prePersist() {

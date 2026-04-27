@@ -30,10 +30,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(request -> {
                     var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
                     corsConfiguration.setAllowedOrigins(java.util.List.of("http://localhost:3000"));
-                    corsConfiguration
-                            .setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+                    corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                     corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
                     corsConfiguration.setAllowCredentials(true);
+                    corsConfiguration.setExposedHeaders(java.util.List.of("Authorization"));
                     return corsConfiguration;
                 }))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -46,11 +46,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/stages", "/api/stages/**")
                         .hasAnyAuthority("ROLE_RESPONSABLE_STAGE", "ROLE_ADMINISTRATEUR", "ROLE_ENCADRANT", "ROLE_STAGIAIRE")
                         .requestMatchers("/api/encadrant/**").hasAuthority("ROLE_ENCADRANT")
+                        .requestMatchers("/api/folders-stage", "/api/folders-stage/**").permitAll()
                         .requestMatchers("/api/notifications/all").permitAll()
                         .requestMatchers("/api/notifications/**")
                         .hasAnyAuthority("ROLE_ENCADRANT", "ROLE_STAGIAIRE", "ROLE_ADMINISTRATEUR",
                                 "ROLE_RESPONSABLE_STAGE")
                         .requestMatchers("/api/stagiaire/**").hasAuthority("ROLE_STAGIAIRE")
+                        .requestMatchers("/api/dashboard/**").hasAnyAuthority("ROLE_ADMINISTRATEUR", "ROLE_RESPONSABLE_STAGE", "ROLE_ENCADRANT")
+                        .requestMatchers("/api/sujets/**").hasAnyAuthority("ROLE_RESPONSABLE_STAGE", "ROLE_ENCADRANT", "ROLE_STAGIAIRE", "ROLE_ADMINISTRATEUR")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

@@ -10,6 +10,8 @@ public class DossierStageResponse {
     private String universite;
     private String specialite;
     private String niveauEtude;
+    private String cvPath;
+    private String portfolioPath;
     private LocalDateTime dateCreation;
     // Stagiaire
     private Long stagiaireId;

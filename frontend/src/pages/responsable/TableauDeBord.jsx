@@ -9,24 +9,26 @@ import {
   telechargerPdf,
 } from "../../api/dashboardAPI";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  BarChart2, PieChart, TrendingUp, Users, 
-  UserCheck, Calendar, Star, FileText, Download, 
-  Award, RefreshCw, ChevronUp, Clock, Info
+import {
+  BarChart2, PieChart, TrendingUp, Users,
+  UserCheck, Calendar, Star, FileText, Download,
+  Award, RefreshCw, ChevronUp, Clock, Info,
+  LayoutDashboard, ClipboardList, GraduationCap, BarChart as BarChartIcon
 } from "lucide-react";
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/responsable/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/responsable/stages", icon: "📋", label: "Stages" },
-  { path: "/responsable/sujets", icon: "📝", label: "Sujets" },
-  { path: "/responsable/stagiaires", icon: "🎓", label: "Stagiaires" },
-  { path: "/responsable/analytique", icon: "📊", label: "Analytique" },
+  { path: "/responsable/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/responsable/stages", icon: <ClipboardList size={18} />, label: "Stages" },
+  { path: "/responsable/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/responsable/stagiaires", icon: <GraduationCap size={18} />, label: "Stagiaires" },
+  { path: "/responsable/analytique", icon: <BarChartIcon size={18} />, label: "Analytique" },
 ];
 
 // ── Composant KPI Card Elite ────────────────────────────────────────
 function KpiCard({ icon: Icon, label, value, sub, color, delay = 0 }) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
@@ -136,7 +138,7 @@ function BarChart({ data, title }) {
               <span className="bar-val">{d.value} missions</span>
             </div>
             <div className="bar-track">
-              <motion.div 
+              <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${(d.value / max) * 100}%` }}
                 transition={{ duration: 1, delay: i * 0.05 }}
@@ -153,18 +155,19 @@ function BarChart({ data, title }) {
 
 export default function TableauDeBord() {
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportingId, setExportingId] = useState(null);
   const [error, setError] = useState("");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeSession]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await getDashboardComplet();
+      const { data } = await getDashboardComplet(activeSession);
       setStats(data);
     } catch {
       setError("Synchronisation analytique échouée.");
@@ -202,9 +205,9 @@ export default function TableauDeBord() {
       <Sidebar navItems={NAV} />
       <Topbar />
       <main className="main-content flex-center">
-        <motion.div 
-          animate={{ opacity: [0.4, 1, 0.4] }} 
-          transition={{ repeat: Infinity, duration: 2 }} 
+        <motion.div
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ repeat: Infinity, duration: 2 }}
           className="loading-state-elite"
         >
           <RefreshCw size={48} className="spin text-primary" />
@@ -219,31 +222,31 @@ export default function TableauDeBord() {
       <Sidebar navItems={NAV} />
       <Topbar />
       <main className="main-content fade-in">
-        
+
         {/* HEADER ELITE */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="premium-analytics-header"
         >
           <div className="header-meta">
-            <span className="badge-elite blue">PROMOTION 2024</span>
+            <span className="badge-elite blue">PROMOTION {activeSession}</span>
             <h1 className="gradient-text">Excellence Analytics</h1>
             <p>Intelligence opérationnelle et tracking de performance des stages Clinisys.</p>
           </div>
           <div className="header-actions">
-             <button className="btn btn-primary elite-btn" onClick={handleExportGlobal} disabled={exporting}>
-               {exporting ? <RefreshCw className="spin" /> : <Download size={20} />}
-               <span>Générer Rapport Global</span>
-             </button>
+            <button className="btn btn-primary elite-btn" onClick={handleExportGlobal} disabled={exporting}>
+              {exporting ? <RefreshCw className="spin" /> : <Download size={20} />}
+              <span>Générer Rapport Global</span>
+            </button>
           </div>
         </motion.div>
 
-        {error && <div className="alert-elite danger"><Info size={18}/> {error}</div>}
+        {error && <div className="alert-elite danger"><Info size={18} /> {error}</div>}
 
         {stats && (
           <div className="analytics-body">
-            
+
             {/* KPI TRACKING GRID */}
             <div className="stats-grid-elite">
               <KpiCard icon={Users} label="Total Stagiaires" value={stats.nbStagiaires} color="#6366f1" delay={0.1} />
@@ -253,26 +256,26 @@ export default function TableauDeBord() {
             </div>
 
             {/* PROGRESS OVERVIEW */}
-            <motion.div 
-               initial={{ opacity: 0, scale: 0.98 }}
-               animate={{ opacity: 1, scale: 1 }}
-               className="premium-card progress-hero"
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="premium-card progress-hero"
             >
-               <div className="hero-content">
-                  <div className="hero-text">
-                    <h3>Avancement de la Promotion</h3>
-                    <p>Calculé sur la base des livrables et sprints validés.</p>
-                  </div>
-                  <div className="hero-val">{stats.tauxAvancementGlobal?.toFixed(1)}%</div>
-               </div>
-               <div className="elite-progress-track">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${stats.tauxAvancementGlobal || 0}%` }}
-                    transition={{ duration: 1.5, ease: "circOut" }}
-                    className="elite-progress-fill"
-                  />
-               </div>
+              <div className="hero-content">
+                <div className="hero-text">
+                  <h3>Avancement de la Promotion</h3>
+                  <p>Calculé sur la base des livrables et sprints validés.</p>
+                </div>
+                <div className="hero-val">{stats.tauxAvancementGlobal?.toFixed(1)}%</div>
+              </div>
+              <div className="elite-progress-track">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stats.tauxAvancementGlobal || 0}%` }}
+                  transition={{ duration: 1.5, ease: "circOut" }}
+                  className="elite-progress-fill"
+                />
+              </div>
             </motion.div>
 
             {/* DATA VISUALIZATION */}
@@ -282,77 +285,78 @@ export default function TableauDeBord() {
             </div>
 
             <div className="grid-analytics-main">
-               {/* BAR CHART: LOAD */}
-               <div className="left-panel-analytics">
-                 {stats.chargeEncadrants?.length > 0 && (
-                   <BarChart 
-                      title="Charge de Tutorat par Encadrant" 
-                      data={stats.chargeEncadrants.map(e => ({
-                        label: `${e.encadrantPrenom} ${e.encadrantNom}`,
-                        value: Number(e.nbStagiaires),
-                        color: 'var(--primary)'
-                      }))}
-                   />
-                 )}
-               </div>
+              {/* BAR CHART: LOAD */}
+              <div className="left-panel-analytics">
+                {stats.chargeEncadrants?.length > 0 && (
+                  <BarChart
+                    title="Charge de Tutorat par Encadrant"
+                    data={stats.chargeEncadrants.map(e => ({
+                      label: `${e.encadrantPrenom} ${e.encadrantNom}`,
+                      value: Number(e.nbStagiaires),
+                      color: 'var(--primary)'
+                    }))}
+                  />
+                )}
+              </div>
 
-               {/* EXCELLENCE WALL */}
-               <div className="right-panel-analytics">
-                  <div className="premium-card excellence-card">
-                    <div className="card-header-v2">
-                       <h3 className="excellence-title"><Award size={20} /> Hall of Excellence</h3>
-                       <span className="subtitle">Top 5 de la promotion</span>
-                    </div>
-                    
-                    <div className="excellence-list">
-                       {stats.topStagiaires?.map((s, i) => {
-                          const note = s.moyenne || 0;
-                          const MEDALS = ["🥇", "🥈", "🥉", "🎖️", "🎖️"];
-                          return (
-                            <motion.div 
-                              key={s.stagiaireId}
-                              whileHover={{ x: 8, background: 'var(--primary-light-alpha)' }}
-                              className={`excellence-item ${i === 0 ? 'top-1' : ''}`}
-                            >
-                               <div className="rank-badge">{MEDALS[i]}</div>
-                               <div className="profile-box">
-                                  <div className="avatar-mini">{s.stagiairePrenom[0]}{s.stagiaireNom[0]}</div>
-                                  <div className="names">
-                                     <span className="full-name">{s.stagiairePrenom} {s.stagiaireNom}</span>
-                                     <span className="mention">{note >= 16 ? 'Distingé' : 'Mention Bien'}</span>
-                                  </div>
-                               </div>
-                               <div className="metrics-box">
-                                  <div className="progress-mini">
-                                     <div className="track"><div className="fill" style={{ width: `${s.tauxAvancement}%` }} /></div>
-                                     <span>{s.tauxAvancement?.toFixed(0)}%</span>
-                                  </div>
-                                  <div className="final-note">
-                                     <span className="n">{note.toFixed(1)}</span>
-                                     <span className="total">/20</span>
-                                  </div>
-                               </div>
-                               <button 
-                                 className="export-mini-btn" 
-                                 title="Exporter Dossier"
-                                 onClick={() => handleExportStagiaire(s.stagiaireId, `${s.stagiairePrenom} ${s.stagiaireNom}`)}
-                                 disabled={exportingId === s.stagiaireId}
-                               >
-                                 {exportingId === s.stagiaireId ? <RefreshCw spin size={14}/> : <FileText size={14}/>}
-                               </button>
-                            </motion.div>
-                          )
-                       })}
-                    </div>
+              {/* EXCELLENCE WALL */}
+              <div className="right-panel-analytics">
+                <div className="premium-card excellence-card">
+                  <div className="card-header-v2">
+                    <h3 className="excellence-title"><Award size={20} /> Hall of Excellence</h3>
+                    <span className="subtitle">Top 5 de la promotion</span>
                   </div>
-               </div>
+
+                  <div className="excellence-list">
+                    {stats.topStagiaires?.map((s, i) => {
+                      const note = s.moyenne || 0;
+                      const MEDALS = ["🥇", "🥈", "🥉", "🎖️", "🎖️"];
+                      return (
+                        <motion.div
+                          key={s.stagiaireId}
+                          whileHover={{ x: 8, background: 'var(--primary-light-alpha)' }}
+                          className={`excellence-item ${i === 0 ? 'top-1' : ''}`}
+                        >
+                          <div className="rank-badge">{MEDALS[i]}</div>
+                          <div className="profile-box">
+                            <div className="avatar-mini">{s.stagiairePrenom[0]}{s.stagiaireNom[0]}</div>
+                            <div className="names">
+                              <span className="full-name">{s.stagiairePrenom} {s.stagiaireNom}</span>
+                              <span className="mention">{note >= 16 ? 'Distingé' : 'Mention Bien'}</span>
+                            </div>
+                          </div>
+                          <div className="metrics-box">
+                            <div className="progress-mini">
+                              <div className="track"><div className="fill" style={{ width: `${s.tauxAvancement}%` }} /></div>
+                              <span>{s.tauxAvancement?.toFixed(0)}%</span>
+                            </div>
+                            <div className="final-note">
+                              <span className="n">{note.toFixed(1)}</span>
+                              <span className="total">/20</span>
+                            </div>
+                          </div>
+                          <button
+                            className="export-mini-btn"
+                            title="Exporter Dossier"
+                            onClick={() => handleExportStagiaire(s.stagiaireId, `${s.stagiairePrenom} ${s.stagiaireNom}`)}
+                            disabled={exportingId === s.stagiaireId}
+                          >
+                            {exportingId === s.stagiaireId ? <RefreshCw spin size={14} /> : <FileText size={14} />}
+                          </button>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
 
           </div>
         )}
       </main>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .premium-analytics-header {
           display: flex; justify-content: space-between; align-items: flex-end;
           margin-bottom: 40px; border-bottom: 2px solid var(--border); padding-bottom: 32px;

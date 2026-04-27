@@ -6,23 +6,22 @@ import Topbar  from '../../components/common/Topbar';
 import { useAuth }  from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getTachesByStagiaire }   from '../../api/tacheAPI';
-import { getMoyenne }             from '../../api/evaluationAPI';
+import { getMoyenne, getEvalsByStagiaire } from '../../api/evaluationAPI';
 import { getStagesByStagiaire }   from '../../api/stageAPI';
 import { getMonChoix }            from '../../api/sujetAPI';
-import { 
-  Rocket, BookOpen, CheckSquare, Clock, 
-  Star, Briefcase, Award, ArrowRight,
-  TrendingUp, Activity, Info, AlertTriangle,
-  ChevronRight, Calendar, User, Zap
+import { useSession }             from '../../context/SessionContext';
+import {
+  LayoutDashboard, FileText, RefreshCw, CheckSquare, Star,
+  Calendar, Zap, AlertTriangle, ChevronRight, Activity, Clock, Briefcase, Award, User, Sparkles, ArrowRight, Rocket, Layers, BookOpen
 } from 'lucide-react';
 
 const NAV = [
-  { path: '/stagiaire/dashboard',   icon: '⊞', label: 'Mon espace'      },
-  { path: '/stagiaire/sujets',      icon: '📝', label: 'Sujets'          },
-  { path: '/stagiaire/sprints',     icon: '🔄', label: 'Mes sprints'     },
-  { path: '/stagiaire/taches',      icon: '✅', label: 'Mes tâches'      },
-  { path: '/stagiaire/reunions',    icon: '📅', label: 'Mes réunions'    },
-  { path: '/stagiaire/evaluations', icon: '⭐', label: 'Mes évaluations' },
+  { path: '/stagiaire/dashboard',   icon: <LayoutDashboard size={18} />, label: 'Mon espace'      },
+  { path: '/stagiaire/sujets',      icon: <FileText size={18} />, label: 'Sujets'          },
+  { path: '/stagiaire/sprints',     icon: <RefreshCw size={18} />, label: 'Mes sprints'     },
+  { path: '/stagiaire/taches',      icon: <CheckSquare size={18} />, label: 'Mes tâches'      },
+  { path: '/stagiaire/reunions',    icon: <Calendar size={18} />, label: 'Mes réunions'    },
+  { path: '/stagiaire/evaluations', icon: <Star size={18} />, label: 'Mes évaluations' },
 ];
 
 function StatCard({ icon: Icon, label, value, color, delay = 0 }) {
@@ -49,6 +48,7 @@ function StatCard({ icon: Icon, label, value, color, delay = 0 }) {
 export default function StagiaireDashboard() {
   const { user }        = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
   const navigate        = useNavigate();
 
   const [taches,   setTaches]   = useState([]);
@@ -59,22 +59,35 @@ export default function StagiaireDashboard() {
 
   useEffect(() => {
     if (user?.id) load();
-  }, [user]);
+  }, [user, activeSession]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [tachesRes, stagesRes, moyenneRes, choixRes] = await Promise.all([
+      const [tachesRes, stagesRes, evalsRes, choixRes] = await Promise.all([
         getTachesByStagiaire(user.id).catch(() => ({ data: [] })),
         getStagesByStagiaire(user.id).catch(() => ({ data: [] })),
-        getMoyenne(user.id).catch(() => ({ data: { moyenne: null } })),
+        getEvalsByStagiaire(user.id).catch(() => ({ data: [] })),
         getMonChoix(user.id).catch(() => ({ data: null })),
       ]);
-      setTaches(tachesRes.data || []);
-      setStage((stagesRes.data || [])[0] || null);
-      setMoyenne(moyenneRes.data?.moyenne || null);
+      const sessionStr = String(activeSession);
+      const filteredTaches = (tachesRes.data || []).filter(t => !t.annee || String(t.annee) === sessionStr);
+      setTaches(filteredTaches);
+
+      const stages = (stagesRes.data || []).filter(s => !s.annee || String(s.annee) === sessionStr);
+      setStage(stages[0] || null);
+
+      const filteredEvals = (evalsRes.data || []).filter(e => !e.annee || String(e.annee) === sessionStr);
+      if (filteredEvals.length > 0) {
+        const sum = filteredEvals.reduce((acc, curr) => acc + (curr.noteGlobale || 0), 0);
+        setMoyenne(sum / filteredEvals.length);
+      } else {
+        setMoyenne(null);
+      }
       setMonChoix(choixRes.data || null);
-    } catch {}
+    } catch (err) {
+      console.error("Erreur de chargement du dashboard:", err);
+    }
     finally { setLoading(false); }
   };
 
@@ -106,7 +119,7 @@ export default function StagiaireDashboard() {
            <div className="hero-left">
               <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                  <div className="hero-badge"><Zap size={14} /> PERSPECTIVE CARRIÈRE</div>
-                 <h1 className="gradient-text">Bienvenue, {user?.prenom} 🚀</h1>
+                 <h1 className="gradient-text">Bienvenue, {user?.prenom} <Rocket size={28} style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 8 }} /></h1>
                  <p>Votre tableau de bord centralisé pour piloter vos projets et vos performances.</p>
               </motion.div>
            </div>
@@ -150,22 +163,31 @@ export default function StagiaireDashboard() {
 
         <div className="stagiaire-main-grid">
            {/* MY INTERNSHIP */}
-           <div className="premium-card internship-details-card">
+            <div className="premium-card internship-details-card">
               <div className="card-header-v2">
                  <div className="title-box">
                     <Briefcase size={20} className="text-primary" />
-                    <h3>Mon Stage Actif</h3>
+                    <h3>{stage?.statut === 'VALIDE' ? 'Stage Terminé' : 'Mon Stage Actif'}</h3>
                  </div>
-                 <button className="text-link-btn" onClick={() => navigate('/stagiaire/sprints')}>
-                   Voir Roadmap <ChevronRight size={16} />
-                 </button>
+                 {stage?.statut !== 'VALIDE' && (
+                   <button className="text-link-btn" onClick={() => navigate('/stagiaire/sprints')}>
+                     Voir Roadmap <ChevronRight size={16} />
+                   </button>
+                 )}
               </div>
 
               {loading ? (
                 <div className="skeleton-loader h-150"></div>
               ) : stage ? (
                 <div className="stage-info-content">
-                   <h4 className="stage-sujet-title">{stage.sujet}</h4>
+                   <div className="stage-header-flex">
+                      <h4 className="stage-sujet-title">{stage.sujet}</h4>
+                      {stage.statut === 'VALIDE' && (
+                        <div className="completion-badge-v2">
+                           <Award size={16} /> VALIDÉ
+                        </div>
+                      )}
+                   </div>
                    
                    <div className="stage-meta-hub">
                       <div className="meta-item-elite">
@@ -184,20 +206,31 @@ export default function StagiaireDashboard() {
                       </div>
                    </div>
 
-                   <div className="stage-progress-hub">
-                      <div className="p-head">
-                         <span>Avancement Global</span>
-                         <span className="p-val">{Math.round(stage.tauxAvancement || 0)}%</span>
-                      </div>
-                      <div className="p-track">
-                         <motion.div 
-                           initial={{ width: 0 }}
-                           animate={{ width: `${stage.tauxAvancement || 0}%` }}
-                           transition={{ duration: 1.5, ease: 'easeOut' }}
-                           className="p-fill" 
-                         />
-                      </div>
-                   </div>
+                   {stage.statut === 'VALIDE' ? (
+                     <div className="congrats-banner-elite">
+                        <div className="c-icon"><Sparkles size={24} /></div>
+                        <div className="c-text">
+                           <strong>Félicitations !</strong>
+                           <p>Votre stage a été validé avec succès. Vous pouvez désormais consulter votre bulletin final.</p>
+                        </div>
+                        <button className="btn-mini-view" onClick={() => navigate('/stagiaire/evaluations')}>Voir Notes</button>
+                     </div>
+                   ) : (
+                     <div className="stage-progress-hub">
+                        <div className="p-head">
+                           <span>Avancement Global</span>
+                           <span className="p-val">{Math.round(stage.tauxAvancement || 0)}%</span>
+                        </div>
+                        <div className="p-track">
+                           <motion.div 
+                             initial={{ width: 0 }}
+                             animate={{ width: `${stage.tauxAvancement || 0}%` }}
+                             transition={{ duration: 1.5, ease: 'easeOut' }}
+                             className="p-fill" 
+                           />
+                        </div>
+                     </div>
+                   )}
                 </div>
               ) : (
                 <div className="empty-stage-placeholder">
@@ -205,7 +238,7 @@ export default function StagiaireDashboard() {
                    <p>Aucun stage actif détecté pour votre profil.</p>
                 </div>
               )}
-           </div>
+            </div>
 
            {/* MY PERFORMANCE */}
            <div className="premium-card performance-card">
@@ -331,9 +364,16 @@ export default function StagiaireDashboard() {
         .empty-stage-placeholder .p-icon { margin-bottom: 16px; }
 
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); } 70% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+
+        .stage-header-flex { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+        .completion-badge-v2 { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: #10b981; color: #fff; border-radius: 12px; font-size: 12px; font-weight: 900; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+        .congrats-banner-elite { display: flex; align-items: center; gap: 24px; padding: 24px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1.5px solid #10b981; border-radius: 20px; margin-top: 10px; }
+        .c-icon { width: 56px; height: 56px; border-radius: 16px; background: #fff; display: flex; align-items: center; justify-content: center; color: #10b981; box-shadow: 0 8px 20px rgba(16,185,129,0.2); }
+        .c-text strong { display: block; font-size: 18px; color: #065f46; margin-bottom: 4px; }
+        .c-text p { font-size: 14px; color: #065f46; opacity: 0.8; line-height: 1.5; margin: 0; }
+        .btn-mini-view { margin-left: auto; background: #fff; border: 1.5px solid #10b981; padding: 10px 20px; border-radius: 12px; font-weight: 900; color: #10b981; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+        .btn-mini-view:hover { background: #10b981; color: #fff; }
       ` }} />
     </div>
   );
 }
-
-import { Layers } from 'lucide-react';

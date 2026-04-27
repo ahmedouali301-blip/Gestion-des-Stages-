@@ -11,6 +11,10 @@ public interface DossierStageRepository extends JpaRepository<DossierStage, Long
 
     List<DossierStage> findByResponsableIdAndAnneeStage(Long responsableId, String annee);
 
+    boolean existsByStagiaireIdAndAnneeStage(Long stagiaireId, String annee);
+
     @Query("SELECT DISTINCT d.anneeStage FROM DossierStage d WHERE d.responsable.id = :id ORDER BY d.anneeStage DESC")
     List<String> findAnneesByResponsable(@Param("id") Long responsableId);
+
+    List<DossierStage> findByStagiaireId(Long stagiaireId);
 }

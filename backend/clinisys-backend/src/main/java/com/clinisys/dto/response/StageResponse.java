@@ -35,4 +35,8 @@ public class StageResponse {
     private String stagiaire2Nom;
     private String stagiaire2Prenom;
     private Boolean estBinome;
+    private java.time.LocalDateTime dateCreation;
+    private Long dossierId;
+    private Long dossier2Id;
+    private String annee;
 }

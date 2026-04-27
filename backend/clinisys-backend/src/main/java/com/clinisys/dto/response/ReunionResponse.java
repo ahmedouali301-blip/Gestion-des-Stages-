@@ -34,4 +34,6 @@ public class ReunionResponse {
     private Boolean acceptationStagiaire2;
     private Boolean acceptationEncadrant;
     private String description;
+    private Long stageId;
+    private String annee;
 }

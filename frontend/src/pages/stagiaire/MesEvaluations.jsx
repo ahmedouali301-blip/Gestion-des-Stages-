@@ -5,20 +5,19 @@ import { useAuth } from "../../context/AuthContext";
 import { getEvalsByStagiaire, getMoyenne } from "../../api/evaluationAPI";
 import Topbar from "../../components/common/Topbar";
 import { useTheme } from "../../context/ThemeContext";
-import { 
-  Award, TrendingUp, Star, Calendar, 
-  ChevronRight, ArrowRight, MessageSquare, 
-  Target, Cpu, Clock, Activity, Users,
-  CheckCircle, RefreshCw, BarChart3
+import {
+  CheckCircle, RefreshCw, BarChart3,
+  LayoutDashboard, FileText, Star, Calendar, Cpu, Clock, Target, Users, MessageSquare
 } from 'lucide-react';
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/stagiaire/dashboard", icon: "⊞", label: "Mon espace" },
-  { path: "/stagiaire/sujets", icon: "📝", label: "Sujets" },
-  { path: '/stagiaire/sprints',     icon: '🔄', label: 'Mes sprints'     },
-  { path: "/stagiaire/taches", icon: "✅", label: "Mes tâches" },
-  { path: "/stagiaire/reunions", icon: "📅", label: "Mes réunions" },
-  { path: "/stagiaire/evaluations", icon: "⭐", label: "Mes évaluations" },
+  { path: "/stagiaire/dashboard", icon: <LayoutDashboard size={18} />, label: "Mon espace" },
+  { path: "/stagiaire/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: '/stagiaire/sprints',     icon: <RefreshCw size={18} />, label: 'Mes sprints'     },
+  { path: "/stagiaire/taches", icon: <CheckCircle size={18} />, label: "Mes tâches" },
+  { path: "/stagiaire/reunions", icon: <Calendar size={18} />, label: "Mes réunions" },
+  { path: "/stagiaire/evaluations", icon: <Star size={18} />, label: "Mes évaluations" },
 ];
 
 const CRITERES = [
@@ -62,6 +61,7 @@ function AnalyticsRing({ value, label, icon: Icon, color, delay = 0 }) {
 const MesEvaluations = () => {
   const { user } = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
   const [evals, setEvals] = useState([]);
   const [moyenne, setMoyenne] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -69,14 +69,24 @@ const MesEvaluations = () => {
 
   useEffect(() => {
     if (!user?.id) return;
+    setLoading(true);
     Promise.all([getEvalsByStagiaire(user.id), getMoyenne(user.id)])
       .then(([e, m]) => {
-        setEvals(e.data);
-        setMoyenne(m.data.moyenne);
-        if (e.data.length > 0) setSelected(e.data[0]);
+        const sessionStr = String(activeSession);
+        const filteredEvals = (e.data || []).filter(ev => !ev.annee || String(ev.annee) === sessionStr);
+        setEvals(filteredEvals);
+        
+        if (filteredEvals.length > 0) {
+          const sum = filteredEvals.reduce((acc, curr) => acc + (curr.noteGlobale || 0), 0);
+          setMoyenne(sum / filteredEvals.length);
+          setSelected(filteredEvals[0]);
+        } else {
+          setMoyenne(null);
+          setSelected(null);
+        }
       })
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [user, activeSession]);
 
   const getMention = (note) => {
     if (!note) return { label: "En attente", color: "#94a3b8", bg: "rgba(148,163,184,0.1)" };
@@ -115,7 +125,7 @@ const MesEvaluations = () => {
           <div className="loader-eval"><RefreshCw className="spin" size={40} /> Analyse du bulletin...</div>
         ) : evals.length === 0 ? (
           <div className="empty-eval-state">
-             <Star size={64} opacity={0.1} />
+             <div style={{ marginBottom: 20, opacity: 0.1 }}><Star size={64} /></div>
              <h3>Bulletin non disponible</h3>
              <p>Votre encadrant publiera vos premières notes après la clôture du prochain sprint.</p>
           </div>

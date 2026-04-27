@@ -30,6 +30,14 @@ public class ReunionService {
     // ── Planifier une réunion ─────────────────────────────────
     @Transactional
     public ReunionResponse planifier(ReunionRequest req, String roleCreateur) {
+        // ✅ Vérification du verrouillage si stageId est présent
+        if (req.getStageId() != null) {
+            stageRepository.findById(req.getStageId()).ifPresent(stage -> {
+                if ("VALIDE".equals(stage.getStatut())) {
+                    throw new RuntimeException("Impossible de planifier une réunion pour un dossier déjà validé et scellé.");
+                }
+            });
+        }
 
         Reunion reunion = new Reunion();
         reunion.setTitre(req.getTitre());
@@ -70,6 +78,7 @@ public class ReunionService {
                 if (reunion.getStagiaire2() == null && stage.getStagiaire2() != null) {
                     reunion.setStagiaire2(stage.getStagiaire2());
                 }
+                reunion.setStage(stage);
             });
         }
 
@@ -97,14 +106,11 @@ public class ReunionService {
         }
 
         if ("ROLE_STAGIAIRE".equals(roleCreateur)) {
-            System.out.println("DEBUG: Envoi notif à l'encadrant ID="
-                    + (reunion.getEncadrant() != null ? reunion.getEncadrant().getId() : "NULL"));
             notificationService.envoyerNotification(reunion.getEncadrant(), "Nouvelle proposition de réunion",
                     "Le stagiaire " + (reunion.getStagiaire() != null ? reunion.getStagiaire().getPrenom() : "")
                             + " a proposé une réunion : " + reunion.getTitre(),
                     "REUNION_PROPOSEE", saved);
         } else {
-            System.out.println("DEBUG: Envoi notif aux stagiaires...");
             if (reunion.getStagiaire() != null) {
                 notificationService.envoyerNotification(reunion.getStagiaire(), "Nouvelle réunion proposée",
                         "L'encadrant a proposé une réunion : " + reunion.getTitre(), "REUNION_PROPOSEE", saved);
@@ -123,6 +129,7 @@ public class ReunionService {
     @Transactional
     public ReunionResponse accepterParEncadrant(Long id) {
         Reunion reunion = getReunion(id);
+        verifierLock(reunion);
         reunion.setAcceptationEncadrant(true);
 
         if (reunion.getAcceptationStagiaire1() && reunion.getAcceptationStagiaire2()) {
@@ -144,6 +151,7 @@ public class ReunionService {
     @Transactional
     public ReunionResponse reporterReunionParEncadrant(Long id, String motif, LocalDateTime nouvelleDate) {
         Reunion reunion = getReunion(id);
+        verifierLock(reunion);
         reunion.setStatut("PROPOSEE");
         reunion.setObservations("Report demandé par l'encadrant. Motif : " + motif);
         reunion.setDateHeure(nouvelleDate);
@@ -172,6 +180,7 @@ public class ReunionService {
     @Transactional
     public ReunionResponse accepterReunion(Long id, Long stagiaireId) {
         Reunion reunion = getReunion(id);
+        verifierLock(reunion);
 
         if (reunion.getStagiaire() != null && reunion.getStagiaire().getId().equals(stagiaireId)) {
             reunion.setAcceptationStagiaire1(true);
@@ -194,6 +203,7 @@ public class ReunionService {
     @Transactional
     public ReunionResponse reporterReunion(Long id, Long stagiaireId, Map<String, String> data) {
         Reunion reunion = getReunion(id);
+        verifierLock(reunion);
         String motif = data.get("motif");
         LocalDateTime nouvelleDate = LocalDateTime.parse(data.get("nouvelleDate"));
 
@@ -220,6 +230,7 @@ public class ReunionService {
     @Transactional
     public ReunionResponse deciderReportage(Long id, Boolean accepte) {
         Reunion reunion = getReunion(id);
+        verifierLock(reunion);
         if (accepte) {
             reunion.setStatut("PLANIFIEE");
             reunion.setAcceptationStagiaire1(true);
@@ -247,6 +258,7 @@ public class ReunionService {
     // ── Changer le statut ─────────────────────────────────────
     public ReunionResponse changerStatut(Long id, String statut) {
         Reunion reunion = getReunion(id);
+        verifierLock(reunion);
         reunion.setStatut(statut);
         return toResponse(reunionRepository.save(reunion));
     }
@@ -254,6 +266,7 @@ public class ReunionService {
     // ── Ajouter observations et recommandations ───────────────
     public ReunionResponse ajouterNotes(Long id, Map<String, String> notes) {
         Reunion reunion = getReunion(id);
+        verifierLock(reunion);
         if (notes.containsKey("observations"))
             reunion.setObservations(notes.get("observations"));
         if (notes.containsKey("recommandations"))
@@ -264,6 +277,7 @@ public class ReunionService {
     // ── Rédiger le PV ─────────────────────────────────────────
     public PvResponse redigerPv(PvRequest req) {
         Reunion reunion = getReunion(req.getReunionId());
+        verifierLock(reunion);
 
         if (reunion.getPv() != null)
             throw new RuntimeException("Un PV existe déjà pour cette réunion");
@@ -315,6 +329,14 @@ public class ReunionService {
                 .orElseThrow(() -> new RuntimeException("Réunion non trouvée"));
     }
 
+    private void verifierLock(Reunion reunion) {
+        if (reunion.getSprint() != null && reunion.getSprint().getStage() != null) {
+            if ("VALIDE".equals(reunion.getSprint().getStage().getStatut())) {
+                throw new RuntimeException("Action impossible : Le dossier de stage associé est validé et scellé.");
+            }
+        }
+    }
+
     private ReunionResponse toResponse(Reunion r) {
         ReunionResponse res = new ReunionResponse();
         res.setId(r.getId());
@@ -350,6 +372,24 @@ public class ReunionService {
             res.setStagiaire2Id(r.getStagiaire2().getId());
             res.setStagiaire2Nom(r.getStagiaire2().getNom());
             res.setStagiaire2Prenom(r.getStagiaire2().getPrenom());
+        }
+        Stage st = r.getStage();
+        if (st == null && r.getSprint() != null) {
+            st = r.getSprint().getStage();
+        }
+
+        if (st != null) {
+            res.setStageId(st.getId());
+            if (st.getDossier() != null) {
+                res.setAnnee(st.getDossier().getAnneeStage());
+            } else if (st.getSujetSession() != null) {
+                res.setAnnee(st.getSujetSession().getAnnee());
+            }
+        }
+        
+        // Fallback ultime sur l'année de la réunion si toujours null
+        if (res.getAnnee() == null && r.getDateHeure() != null) {
+            res.setAnnee(String.valueOf(r.getDateHeure().getYear()));
         }
         return res;
     }

@@ -23,6 +23,7 @@ public interface TacheRepository extends JpaRepository<TacheSprint, Long> {
     @Query("""
         SELECT ts FROM TacheSprint ts
         WHERE ts.sprint.stage.stagiaire.id = :stagiaireId
+        OR ts.sprint.stage.stagiaire2.id = :stagiaireId
     """)
     List<TacheSprint> findAllByStagiaireViaStage(@Param("stagiaireId") Long stagiaireId);
  
@@ -35,4 +36,7 @@ public interface TacheRepository extends JpaRepository<TacheSprint, Long> {
  
     @Query("SELECT COUNT(t) FROM TacheSprint t WHERE t.sprint.id = :sprintId AND t.statut = 'TERMINE'")
     long countTermineesBySprintId(@Param("sprintId") Long sprintId);
+
+    @Query("SELECT COUNT(t) FROM TacheSprint t WHERE t.stagiaire.id = :stagiaireId AND t.statut = 'TERMINE'")
+    long countTermineesByStagiaireId(@Param("stagiaireId") Long stagiaireId);
 }

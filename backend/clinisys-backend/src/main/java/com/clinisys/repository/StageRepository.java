@@ -14,5 +14,5 @@ public interface StageRepository extends JpaRepository<Stage, Long> {
 
     List<Stage> findByStagiaireIdOrStagiaire2Id(Long stagiaireId, Long stagiaire2Id);
 
-    
+    boolean existsByDossierId(Long dossierId);
 }

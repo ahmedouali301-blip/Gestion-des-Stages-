@@ -12,20 +12,20 @@ import {
   affecterTacheASprint,
   retirerTacheDuSprint,
 } from '../../api/tacheAPI';
-import { 
-  RefreshCw, Layers, Target, CheckSquare, 
-  Clock, AlertCircle, ChevronDown, ChevronUp, 
-  CheckCircle, Plus, Trash2, Calendar, Users,
-  Info, Sparkles, TrendingUp, Play, StopCircle
+import {
+  Info, Sparkles, TrendingUp, Play, StopCircle,
+  LayoutDashboard, FileText, Star, RefreshCw, CheckCircle, CheckSquare, Calendar, Users, Layers, ChevronUp, ChevronDown, Plus, Trash2, Target, Clock, AlertCircle
 } from 'lucide-react';
+import ClinisysAlert from '../../utils/SwalUtils';
+import { useSession } from '../../context/SessionContext';
 
 const NAV = [
-  { path: '/stagiaire/dashboard',   icon: '⊞', label: 'Mon espace'      },
-  { path: '/stagiaire/sujets',      icon: '📝', label: 'Sujets'          },
-  { path: '/stagiaire/sprints',     icon: '🔄', label: 'Mes sprints'     },
-  { path: '/stagiaire/taches',      icon: '✅', label: 'Mes tâches'      },
-  { path: '/stagiaire/reunions',    icon: '📅', label: 'Mes réunions'    },
-  { path: '/stagiaire/evaluations', icon: '⭐', label: 'Mes évaluations' },
+  { path: '/stagiaire/dashboard',   icon: <LayoutDashboard size={18} />, label: 'Mon espace'      },
+  { path: '/stagiaire/sujets',      icon: <FileText size={18} />, label: 'Sujets'          },
+  { path: '/stagiaire/sprints',     icon: <RefreshCw size={18} />, label: 'Mes sprints'     },
+  { path: '/stagiaire/taches',      icon: <CheckCircle size={18} />, label: 'Mes tâches'      },
+  { path: '/stagiaire/reunions',    icon: <Calendar size={18} />, label: 'Mes réunions'    },
+  { path: '/stagiaire/evaluations', icon: <Star size={18} />, label: 'Mes évaluations' },
 ];
 
 const STATUT_SPRINT = {
@@ -58,6 +58,7 @@ const deduplicateTaches = (taches) => {
 export default function MesSprints() {
   const { user }        = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [stage,        setStage]        = useState(null);
   const [sprints,      setSprints]      = useState([]);
@@ -73,14 +74,15 @@ export default function MesSprints() {
   const [savingAff,           setSavingAff]           = useState(false);
   const [errorAff,            setErrorAff]            = useState('');
 
-  useEffect(() => { if (user?.id) loadAll(); }, [user]);
+  useEffect(() => { if (user?.id) loadAll(); }, [user, activeSession]);
 
   const loadAll = async () => {
     setLoading(true);
     try {
       const stagesRes = await getStagesByStagiaire(user.id);
-      const stageActif = (stagesRes.data || []).find(s => s.statut === 'EN_COURS' || s.statut === 'EN_ATTENTE') || stagesRes.data?.[0];
-      if (!stageActif) { setLoading(false); return; }
+      const stages = (stagesRes.data || []).filter(s => !s.annee || String(s.annee) === String(activeSession));
+      const stageActif = stages.find(s => s.statut === 'EN_COURS' || s.statut === 'EN_ATTENTE') || stages[0];
+      if (!stageActif) { setStage(null); setSprints([]); setLoading(false); return; }
       setStage(stageActif);
       const sprintsRes = await getSprintsByStage(stageActif.id);
       setSprints(sprintsRes.data || []);
@@ -105,10 +107,20 @@ export default function MesSprints() {
     if (tachesSelectionnees.length === 0) return;
     setSavingAff(true);
     try {
-      await Promise.all(tachesSelectionnees.map(tId => affecterTacheASprint(tId, activeSprint.id)));
-      setShowAffecter(false); loadTaches(activeSprint.id); loadAll();
-    } catch (err) { setErrorAff('Échec de l\'affectation.'); }
-    finally { setSavingAff(false); }
+      // Exécution séquentielle pour éviter les conflits de concurrence en base de données
+      for (const tId of tachesSelectionnees) {
+        await affecterTacheASprint(tId, activeSprint.id);
+      }
+      setShowAffecter(false);
+      loadTaches(activeSprint.id);
+      loadAll();
+      ClinisysAlert.success(`${tachesSelectionnees.length} tâches affectées avec succès.`);
+    } catch (err) {
+      setErrorAff('Échec de l\'affectation.');
+      ClinisysAlert.error("Erreur", "Une ou plusieurs tâches n'ont pas pu être affectées.");
+    } finally {
+      setSavingAff(false);
+    }
   };
 
   return (
@@ -146,7 +158,9 @@ export default function MesSprints() {
           <div className="loader-center"><RefreshCw className="spin" size={40} /> Orchestration du cycle de vie...</div>
         ) : !stage ? (
           <div className="empty-roadmap-state">
-             <div className="icon-box"><Target size={64} /></div>
+             <div className="icon-box">
+                <div style={{ marginBottom: 24, opacity: 0.1 }}><Target size={64} /></div>
+             </div>
              <h3>Aucun projet détecté</h3>
              <p>Les itérations apparaîtront ici une fois votre stage officiellement lancé par le responsable.</p>
           </div>
@@ -201,7 +215,7 @@ export default function MesSprints() {
                            </div>
 
                            <div className="sprint-ops-hub">
-                              {(sprint.statut === 'PLANIFIE' || sprint.statut === 'EN_COURS') && (
+                              {stage?.statut !== 'VALIDE' && (sprint.statut === 'PLANIFIE' || sprint.statut === 'EN_COURS') && (
                                 <button className="btn-add-t-hub" onClick={() => {
                                   setActiveSprint(sprint); setTachesSelectionnees([]);
                                   getTachesDisponibles(stage.id).then(res => { setTachesDisponibles(res.data); setShowAffecter(true); });
@@ -209,7 +223,11 @@ export default function MesSprints() {
                                    <Plus size={16} /> Affecter des Tâches
                                 </button>
                               )}
-                              <p className="ops-disclaimer"><Info size={14} /> Seul votre encadrant technique peut modifier l'état du sprint.</p>
+                              {stage?.statut === 'VALIDE' ? (
+                                <div className="locked-badge-st"><Sparkles size={14} /> STAGE VALIDÉ • CONSULTATION</div>
+                              ) : (
+                                <p className="ops-disclaimer"><Info size={14} /> Seul votre encadrant technique peut modifier l'état du sprint.</p>
+                              )}
                            </div>
 
                            <div className="sprint-tasks-scroller">
@@ -229,7 +247,7 @@ export default function MesSprints() {
                                                 {t.estimation && <span className="t-est"><Clock size={10} /> {t.estimation}j</span>}
                                              </div>
                                           </div>
-                                          {(sprint.statut === 'PLANIFIE' || sprint.statut === 'EN_COURS') && (
+                                          {stage?.statut !== 'VALIDE' && (sprint.statut === 'PLANIFIE' || sprint.statut === 'EN_COURS') && t.statut === 'A_FAIRE' && (
                                             <button className="btn-remove-t" onClick={() => retirerTacheDuSprint(t.id).then(() => loadTaches(sprint.id))}><Trash2 size={14} /></button>
                                           )}
                                        </div>
@@ -253,8 +271,27 @@ export default function MesSprints() {
             <div className="elite-modal-overlay">
                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="elite-modal-card">
                   <div className="modal-header">
-                     <h2>Sélection du Backlog</h2>
-                     <p>Affectation pour le Sprint {activeSprint.numero}</p>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div>
+                           <h2>Sélection du Backlog</h2>
+                           <p>Affectation pour le Sprint {activeSprint.numero}</p>
+                        </div>
+                        {tachesDisponibles.length > 0 && (
+                          <button 
+                            type="button"
+                            className="select-all-link"
+                            onClick={() => {
+                              if (tachesSelectionnees.length === tachesDisponibles.length) {
+                                setTachesSelectionnees([]);
+                              } else {
+                                setTachesSelectionnees(tachesDisponibles.map(t => t.id));
+                              }
+                            }}
+                          >
+                            {tachesSelectionnees.length === tachesDisponibles.length ? 'Désélectionner tout' : 'Tout sélectionner'}
+                          </button>
+                        )}
+                     </div>
                   </div>
                   
                   <div className="taches-picker-list">
@@ -344,6 +381,9 @@ export default function MesSprints() {
         .btn-remove-t { background: none; border: none; color: var(--text-3); cursor: pointer; transition: 0.2s; }
         .btn-remove-t:hover { color: #ef4444; }
 
+        .select-all-link { background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 800; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: 0.2s; }
+        .select-all-link:hover { background: var(--bg-alpha); text-decoration: underline; }
+
         .elite-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .elite-modal-card { background: var(--surface); width: 100%; max-width: 520px; border-radius: 28px; padding: 40px; box-shadow: 0 40px 100px rgba(0,0,0,0.2); }
         .modal-header h2 { font-size: 20px; font-weight: 900; }
@@ -362,6 +402,7 @@ export default function MesSprints() {
         .loader-center { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 60px; color: var(--text-3); font-weight: 700; }
         .empty-roadmap-state { padding: 80px 0; text-align: center; color: var(--text-3); }
         .empty-roadmap-state h3 { color: var(--text); font-size: 20px; font-weight: 900; margin: 16px 0 8px; }
+        .locked-badge-st { display: flex; align-items: center; gap: 8px; padding: 10px 24px; background: var(--primary-light-alpha); color: var(--primary); border-radius: 14px; font-size: 11px; font-weight: 900; letter-spacing: 0.5px; border: 1.5px solid var(--primary-light-alpha); }
       ` }} />
     </div>
   );

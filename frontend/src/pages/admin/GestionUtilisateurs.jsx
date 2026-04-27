@@ -7,11 +7,12 @@ import {
 } from '../../api/utilisateurAPI';
 import { getIdentitesSansCompte, marquerCompteCreer } from '../../api/stagiaireIdentiteAPI';
 import { getRoleLabel, getRoleBadgeClass } from '../../utils/roleHelpers';
-import { 
-  UserPlus, Search, RefreshCw, Edit, Trash2, Key, Check, X,
-  ArrowRight, Shield, ShieldCheck, UserCheck, UserX, Power
+import {
+  ArrowRight, Shield, ShieldCheck, UserCheck, UserX, Power, UserPlus, Plus,
+  LayoutDashboard, Users, Briefcase, GraduationCap, Lock, CheckCircle, RefreshCw, Search, Edit, Key, Trash2
 } from 'lucide-react';
-import ConfirmModal from '../../components/common/ConfirmModal';
+import ClinisysAlert from '../../utils/SwalUtils';
+import Swal from 'sweetalert2';
 import Topbar from '../../components/common/Topbar';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -46,15 +47,15 @@ const Toggle = ({ active, onClick, loading }) => (
 );
 
 const NAV = [
-  { path: '/admin/dashboard',    icon: '⊞', label: 'Tableau de bord' },
-  { path: '/admin/utilisateurs', icon: '👥', label: 'Utilisateurs' },
+  { path: '/admin/dashboard',    icon: <LayoutDashboard size={18} />, label: 'Tableau de bord' },
+  { path: '/admin/utilisateurs', icon: <Users size={18} />, label: 'Utilisateurs' },
 ];
 
 const ROLES_OPTIONS = [
-  { value: 'ROLE_ADMINISTRATEUR',    label: 'Administrateur', icon: '🛡️' },
-  { value: 'ROLE_RESPONSABLE_STAGE', label: 'Responsable de Stage', icon: '👔' },
-  { value: 'ROLE_ENCADRANT',         label: 'Encadrant', icon: '👨‍🏫' },
-  { value: 'ROLE_STAGIAIRE',         label: 'Stagiaire', icon: '🎓' },
+  { value: 'ROLE_ADMINISTRATEUR',    label: 'Administrateur', icon: <Shield size={20} /> },
+  { value: 'ROLE_RESPONSABLE_STAGE', label: 'Responsable de Stage', icon: <Briefcase size={20} /> },
+  { value: 'ROLE_ENCADRANT',         label: 'Encadrant', icon: <Briefcase size={20} /> },
+  { value: 'ROLE_STAGIAIRE',         label: 'Stagiaire', icon: <GraduationCap size={20} /> },
 ];
 
 const EMPTY_FORM = {
@@ -81,15 +82,7 @@ export default function GestionUtilisateurs() {
   const [identitesStagiaires, setIdentitesStagiaires] = useState([]);
   const [selectedIdentiteId,  setSelectedIdentiteId]  = useState('');
 
-  const [confirm, setConfirm] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    type: 'primary',
-    onConfirm: () => {}
-  });
 
-  const closeConfirm = () => setConfirm(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => { load(); }, []);
 
@@ -164,10 +157,14 @@ export default function GestionUtilisateurs() {
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError('');
     try {
+      const payload = { ...form };
+      if (!editMode) {
+        payload.motDePasse = form.cin;
+      }
       if (editMode) {
-        await updateUtilisateur(selectedId, form);
+        await updateUtilisateur(selectedId, payload);
       } else {
-        await createUtilisateur(form);
+        await createUtilisateur(payload);
         if (form.role === 'ROLE_STAGIAIRE' && selectedIdentiteId) {
           await marquerCompteCreer(selectedIdentiteId);
         }
@@ -176,45 +173,76 @@ export default function GestionUtilisateurs() {
       load();
     } catch (err) {
       const msg = err.response?.data?.message || '';
-      if (msg.includes('UKsbO9lhymuesdqO9oktbf4fj3u') || msg.toLowerCase().includes('duplicata') && msg.includes('cin')) {
-        setError('Ce numéro CIN est déjà associé à un autre compte.');
+      let errorMsg = '';
+      if (msg.includes('UKsbO9lhymuesdqO9oktbf4fj3u') || (msg.toLowerCase().includes('duplicata') && msg.includes('cin'))) {
+        errorMsg = 'Ce numéro CIN est déjà associé à un autre compte.';
       } else if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('duplicate')) {
-        setError('Cette adresse email est déjà utilisée.');
+        errorMsg = 'Cette adresse email est déjà utilisée.';
       } else {
-        setError(msg || 'Une erreur est survenue lors de la sauvegarde.');
+        errorMsg = msg || 'Une erreur est survenue lors de la sauvegarde.';
       }
+      ClinisysAlert.error('Erreur', errorMsg);
     } finally { setSaving(false); }
   };
 
   const handleToggle = async (id) => {
-    try { await toggleActif(id); load(); }
-    catch { alert('Erreur changement de statut'); }
+    try { 
+      await toggleActif(id); 
+      load(); 
+      ClinisysAlert.success("Statut mis à jour");
+    }
+    catch { ClinisysAlert.error("Erreur", "Impossible de changer le statut"); }
   };
 
   const handleDelete = (id, nom) => {
-    setConfirm({
-      isOpen: true,
+    ClinisysAlert.confirm({
       title: 'Supprimer l\'utilisateur',
-      message: `Êtes-vous sûr de vouloir supprimer ${nom} ? Cette action est irréversible.`,
-      type: 'danger',
-      onConfirm: async () => {
+      text: `Êtes-vous sûr de vouloir supprimer ${nom} ? Cette action est irréversible.`,
+      confirmText: 'Supprimer',
+      danger: true
+    }).then(async (result) => {
+      if (result.isConfirmed) {
         try {
           await deleteUtilisateur(id);
           load();
-          closeConfirm();
+          ClinisysAlert.success("Utilisateur supprimé");
         } catch {
-          alert('Erreur suppression');
-          closeConfirm();
+          ClinisysAlert.error("Erreur", "Impossible de supprimer l'utilisateur");
         }
       }
     });
   };
 
   const handleReset = async (id) => {
-    const mdp = window.prompt('Nouveau mot de passe (min. 6 caractères) :');
-    if (!mdp || mdp.length < 6) return;
-    try { await resetPassword(id, mdp); alert('Mot de passe réinitialisé.'); }
-    catch { alert('Erreur réinitialisation'); }
+    const { value: mdp } = await Swal.fire({
+      title: 'Réinitialiser le mot de passe',
+      input: 'password',
+      inputLabel: 'Nouveau mot de passe (min. 6 caractères)',
+      inputPlaceholder: 'Entrez le nouveau mot de passe',
+      showCancelButton: true,
+      confirmButtonText: 'Réinitialiser',
+      cancelButtonText: 'Annuler',
+      customClass: {
+        popup: 'premium-swal-popup',
+        confirmButton: 'premium-swal-confirm',
+        cancelButton: 'premium-swal-cancel',
+        input: 'premium-swal-input'
+      },
+      buttonsStyling: false,
+      inputValidator: (value) => {
+        if (!value || value.length < 6) {
+          return 'Le mot de passe doit contenir au moins 6 caractères !'
+        }
+      }
+    });
+
+    if (mdp) {
+      try { 
+        await resetPassword(id, mdp); 
+        ClinisysAlert.success('Succès', 'Mot de passe réinitialisé.'); 
+      }
+      catch { ClinisysAlert.error('Erreur', 'Échec de la réinitialisation'); }
+    }
   };
 
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -250,10 +278,10 @@ export default function GestionUtilisateurs() {
         {/* Stats Summary Area */}
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 32 }}>
           {[
-            { label: 'Total', count: utilisateurs.length, color: 'var(--primary)', icon: '👥' },
-            { label: 'Actifs', count: utilisateurs.filter(u => u.actif).length, color: 'var(--success)', icon: '✅' },
-            { label: 'Inactifs', count: utilisateurs.filter(u => !u.actif).length, color: 'var(--danger)', icon: '🔒' },
-            { label: 'Stagiaires', count: utilisateurs.filter(u => u.role === 'ROLE_STAGIAIRE').length, color: 'var(--accent)', icon: '🎓' },
+            { label: 'Total', count: utilisateurs.length, color: 'var(--primary)', icon: <Users size={24} /> },
+            { label: 'Actifs', count: utilisateurs.filter(u => u.actif).length, color: 'var(--success)', icon: <CheckCircle size={24} /> },
+            { label: 'Inactifs', count: utilisateurs.filter(u => !u.actif).length, color: 'var(--danger)', icon: <Lock size={24} /> },
+            { label: 'Stagiaires', count: utilisateurs.filter(u => u.role === 'ROLE_STAGIAIRE').length, color: 'var(--accent)', icon: <GraduationCap size={24} /> },
           ].map((s, i) => (
             <motion.div 
               key={i}
@@ -263,7 +291,7 @@ export default function GestionUtilisateurs() {
               className="glass-card" 
               style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}
             >
-              <div style={{ fontSize: 24 }}>{s.icon}</div>
+              <div style={{ color: s.color }}>{s.icon}</div>
               <div>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: 600 }}>{s.label}</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.count}</div>
@@ -333,7 +361,7 @@ export default function GestionUtilisateurs() {
                     {filtered.length === 0 ? (
                       <tr>
                         <td colSpan={5} style={{ textAlign: 'center', padding: 60 }}>
-                          <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+                          <div style={{ marginBottom: 12, color: 'var(--text-3)' }}><Search size={48} /></div>
                           <div style={{ color: 'var(--text-2)', fontWeight: 500 }}>Aucun utilisateur ne correspond à votre recherche.</div>
                         </td>
                       </tr>
@@ -460,7 +488,7 @@ export default function GestionUtilisateurs() {
                               cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 10
                             }}
                           >
-                            <span style={{ fontSize: 20 }}>{r.icon}</span>
+                            <div style={{ color: form.role === r.value ? 'var(--primary)' : 'var(--text-3)' }}>{r.icon}</div>
                             <span style={{ fontSize: 13, fontWeight: 600, color: form.role === r.value ? 'var(--primary)' : 'var(--text-2)' }}>{r.label}</span>
                           </div>
                         ))}
@@ -490,7 +518,7 @@ export default function GestionUtilisateurs() {
                     <div className="form-group">
                       <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Prénom *</label>
                       <input 
-                        value={form.prenom} onChange={f('prenom')} required
+                        value={form.prenom} onChange={f('prenom')} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} required
                         placeholder="Ex: Ahmed"
                         readOnly={!editMode && isStagiaire && !!selectedIdentiteId}
                         style={{ borderRadius: 12 }}
@@ -499,7 +527,7 @@ export default function GestionUtilisateurs() {
                     <div className="form-group">
                       <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Nom *</label>
                       <input 
-                        value={form.nom} onChange={f('nom')} required
+                        value={form.nom} onChange={f('nom')} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} required
                         placeholder="Ex: Ouali"
                         readOnly={!editMode && isStagiaire && !!selectedIdentiteId}
                         style={{ borderRadius: 12 }}
@@ -519,9 +547,20 @@ export default function GestionUtilisateurs() {
                   </div>
 
                   {!editMode && (
-                    <div className="form-group" style={{ marginBottom: 20 }}>
-                      <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Mot de passe initial *</label>
-                      <input type="password" value={form.motDePasse} onChange={f('motDePasse')} required minLength={6} style={{ borderRadius: 12 }} />
+                    <div style={{ 
+                      background: 'var(--primary-lt)', 
+                      padding: '12px 16px', 
+                      borderRadius: 12, 
+                      marginBottom: 20, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 12,
+                      border: '1px solid var(--primary-light-alpha)'
+                    }}>
+                      <div style={{ color: 'var(--primary)' }}><Key size={20} /></div>
+                      <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                        Sécurité automatique : Le mot de passe initial sera identique au numéro CIN.
+                      </div>
                     </div>
                   )}
 
@@ -529,7 +568,7 @@ export default function GestionUtilisateurs() {
                     <div className="form-group">
                       <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Numéro CIN *</label>
                       <input 
-                        value={form.cin} onChange={f('cin')} required maxLength={8} pattern="\d{8}"
+                        value={form.cin} onChange={f('cin')} onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }} required maxLength={8} pattern="\d{8}"
                         placeholder="8 chiffres"
                         readOnly={!editMode && isStagiaire && !!selectedIdentiteId}
                         style={{ borderRadius: 12 }}
@@ -538,7 +577,7 @@ export default function GestionUtilisateurs() {
                     <div className="form-group">
                       <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Numéro Téléphone *</label>
                       <input 
-                        value={form.telephone} onChange={f('telephone')} required maxLength={8} pattern="\d{8}"
+                        value={form.telephone} onChange={f('telephone')} onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }} required maxLength={8} pattern="\d{8}"
                         placeholder="8 chiffres"
                         readOnly={!editMode && isStagiaire && !!selectedIdentiteId}
                         style={{ borderRadius: 12 }}
@@ -552,6 +591,7 @@ export default function GestionUtilisateurs() {
                       <input 
                         value={form.role === 'ROLE_RESPONSABLE_STAGE' ? form.departement : form.specialite} 
                         onChange={f(form.role === 'ROLE_RESPONSABLE_STAGE' ? 'departement' : 'specialite')} 
+                        onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} 
                         placeholder="Ex: Informatique"
                         style={{ borderRadius: 12 }}
                       />
@@ -577,15 +617,6 @@ export default function GestionUtilisateurs() {
           )}
         </AnimatePresence>
       </main>
-
-      <ConfirmModal
-        isOpen={confirm.isOpen}
-        title={confirm.title}
-        message={confirm.message}
-        onClose={closeConfirm}
-        onConfirm={confirm.onConfirm}
-        type={confirm.type}
-      />
 
       <style>{`
         .table-row-hover:hover {

@@ -50,6 +50,11 @@ public class Reunion {
 
     @OneToOne(mappedBy = "reunion", cascade = CascadeType.ALL)
     private ProcesVerbal pv;
+
+    @ManyToOne
+    @JoinColumn(name = "stage_id")
+    private Stage stage;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 }

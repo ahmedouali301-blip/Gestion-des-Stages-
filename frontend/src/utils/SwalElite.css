@@ -1,0 +1,124 @@
+/* Clinisys Elite - SweetAlert2 Custom Styling */
+
+.premium-swal-popup {
+    background: var(--surface) !important;
+    border-radius: 24px !important;
+    padding: 2rem !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-lg) !important;
+    color: var(--text) !important;
+    font-family: var(--font-body) !important;
+}
+
+.premium-swal-popup.danger {
+    border-top: 4px solid var(--danger) !important;
+}
+
+.premium-swal-title {
+    font-family: var(--font-head) !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+    font-size: 1.5rem !important;
+    margin-top: 10px !important;
+}
+
+.premium-swal-text {
+    color: var(--text-2) !important;
+    font-size: 1rem !important;
+    margin-top: 10px !important;
+}
+
+.premium-swal-confirm {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%) !important;
+    color: white !important;
+    padding: 0.9rem 2.2rem !important;
+    border-radius: 14px !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    margin: 0.6rem !important;
+    cursor: pointer !important;
+    box-shadow: 0 8px 20px -6px rgba(59, 130, 246, 0.4) !important;
+    border: none !important;
+}
+
+.premium-swal-confirm:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 28px -6px rgba(59, 130, 246, 0.5) !important;
+    filter: brightness(1.05) !important;
+}
+
+.premium-swal-confirm.danger {
+    background: linear-gradient(135deg, #ef4444 0%, #f87171 100%) !important;
+    box-shadow: 0 8px 20px -6px rgba(239, 68, 68, 0.4) !important;
+}
+
+.premium-swal-confirm.danger:hover {
+    box-shadow: 0 12px 28px -6px rgba(239, 68, 68, 0.5) !important;
+}
+
+.premium-swal-cancel {
+    background: var(--surface) !important;
+    color: var(--text-2) !important;
+    padding: 0.9rem 2.2rem !important;
+    border-radius: 14px !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    transition: all 0.25s ease !important;
+    margin: 0.6rem !important;
+    border: 1.5px solid var(--border) !important;
+    cursor: pointer !important;
+}
+
+.premium-swal-cancel:hover {
+    border-color: var(--primary-lt) !important;
+    background: var(--bg) !important;
+    color: var(--primary) !important;
+}
+
+/* Toast Styling */
+.premium-swal-toast {
+    border-radius: 16px !important;
+    background: var(--surface) !important;
+    border-left: 5px solid var(--primary) !important;
+    box-shadow: var(--shadow-md) !important;
+    font-family: var(--font-body) !important;
+}
+
+.premium-swal-toast.success {
+    border-left-color: var(--success) !important;
+}
+
+.premium-swal-icon {
+    border: 2px solid transparent !important;
+}
+
+/* Fix icon colors to match theme */
+.swal2-icon.swal2-success {
+    border-color: var(--success) !important;
+    color: var(--success) !important;
+}
+.swal2-icon.swal2-success [class^=swal2-success-line] {
+    background-color: var(--success) !important;
+}
+.swal2-icon.swal2-success .swal2-success-ring {
+    border: 4px solid var(--success-lt) !important;
+}
+
+.swal2-icon.swal2-error {
+    border-color: var(--danger) !important;
+    color: var(--danger) !important;
+}
+.swal2-icon.swal2-error [class^=swal2-x-mark-line] {
+    background-color: var(--danger) !important;
+}
+
+.swal2-icon.swal2-warning {
+    border-color: var(--warning) !important;
+    color: var(--warning) !important;
+}
+
+.swal2-icon.swal2-info {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}

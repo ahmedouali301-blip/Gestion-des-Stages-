@@ -23,4 +23,6 @@ public class StageRequest {
     private Long encadrantId;
     private Long responsableId;
     private Long sujetRefId; // ID du sujet source
+    private Long dossierId;
+    private Long dossier2Id;
 }

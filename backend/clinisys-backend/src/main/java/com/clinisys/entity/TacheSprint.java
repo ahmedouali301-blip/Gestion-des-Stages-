@@ -20,7 +20,7 @@ public class TacheSprint {
     @JoinColumn(name = "sprint_id", nullable = false)
     private Sprint sprint;
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     @JoinColumn(name = "tache_id", nullable = false)
     private Tache tache;
 

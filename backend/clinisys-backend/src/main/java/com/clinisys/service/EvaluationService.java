@@ -98,6 +98,11 @@ public class EvaluationService {
         if (e.getSprint() != null) {
             r.setSprintId(e.getSprint().getId());
             r.setSprintNom(e.getSprint().getNom());
+            if (e.getSprint().getStage() != null && e.getSprint().getStage().getDossier() != null) {
+                r.setAnnee(e.getSprint().getStage().getDossier().getAnneeStage());
+            } else if (e.getSprint().getStage() != null && e.getSprint().getStage().getSujetSession() != null) {
+                r.setAnnee(e.getSprint().getStage().getSujetSession().getAnnee());
+            }
         }
         return r;
     }

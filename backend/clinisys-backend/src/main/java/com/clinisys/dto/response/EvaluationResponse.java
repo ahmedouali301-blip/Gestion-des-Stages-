@@ -23,4 +23,5 @@ public class EvaluationResponse {
     // Sprint
     private Long   sprintId;
     private String sprintNom;
+    private String annee;
 }

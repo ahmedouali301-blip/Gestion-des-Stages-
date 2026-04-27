@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "choix_sujets", uniqueConstraints = @UniqueConstraint(columnNames = "stagiaire_id"))
+@Table(name = "stagiaire_choix_sujets")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,6 +19,9 @@ public class ChoixSujet {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sujet_id", nullable = false)
     private Sujet sujet;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sujet_session_id", nullable = false)
+    private SujetSession sujetSession;
     private LocalDateTime dateChoix;
 
     @PrePersist

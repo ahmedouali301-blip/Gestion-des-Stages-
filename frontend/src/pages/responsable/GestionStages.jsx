@@ -10,21 +10,23 @@ import {
   deleteStage,
 } from "../../api/stageAPI";
 import { getByRole } from "../../api/utilisateurAPI";
-import { getSujetDuStagiaire, getTousLesChoix } from "../../api/sujetAPI";
+import { getMonChoix, getChoixBySession } from "../../api/sujetAPI";
+import { getDossiersByResponsable } from "../../api/dossierStageAPI";
 import { 
-  Plus, Search, Filter, Calendar, Users, Briefcase, 
-  CheckCircle, XCircle, PlayCircle, AlertCircle, TrendingUp, 
-  Trash2, ChevronRight, Info, Clock, GraduationCap, RefreshCw
+  Trash2, ChevronRight, Info, Clock, GraduationCap, RefreshCw,
+  LayoutDashboard, ClipboardList, FileText, BarChart, Plus, Search, Filter, Calendar, CheckCircle, XCircle, PlayCircle, TrendingUp, Briefcase, Users
 } from 'lucide-react';
 import api from "../../api/axiosConfig";
 import { motion, AnimatePresence } from "framer-motion";
+import ClinisysAlert from "../../utils/SwalUtils";
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/responsable/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/responsable/stages", icon: "📋", label: "Stages" },
-  { path: "/responsable/sujets", icon: "📝", label: "Sujets" },
-  { path: "/responsable/stagiaires", icon: "🎓", label: "Stagiaires" },
-  { path: "/responsable/analytique", icon: "📊", label: "Analytique" },
+  { path: "/responsable/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/responsable/stages", icon: <ClipboardList size={18} />, label: "Stages" },
+  { path: "/responsable/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/responsable/stagiaires", icon: <GraduationCap size={18} />, label: "Stagiaires" },
+  { path: "/responsable/analytique", icon: <BarChart size={18} />, label: "Analytique" },
 ];
 
 const STATUT_COLORS = {
@@ -51,13 +53,21 @@ const EMPTY_FORM = {
 export default function GestionStages() {
   const { user } = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [stages, setStages] = useState([]);
-  const [stagiaires, setStagiaires] = useState([]);
+  const [dossiersList, setDossiersList] = useState([]);
   const [encadrants, setEncadrants] = useState([]);
+  
+  const formatYear = (annee) => {
+    if (!annee) return "";
+    return annee.includes("-") ? annee.split("-")[1] : annee;
+  };
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statutFilter, setStatutFilter] = useState("TOUS");
+  const [anneeFilter, setAnneeFilter] = useState(activeSession);
+  const [dossiers, setDossiers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
@@ -72,7 +82,11 @@ export default function GestionStages() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [activeSession]);
+
+  useEffect(() => {
+    setAnneeFilter(activeSession);
+  }, [activeSession]);
 
   useEffect(() => {
     if (form.dateDebut && form.nbMois) {
@@ -83,30 +97,48 @@ export default function GestionStages() {
         setForm((p) => ({ ...p, dateFin: endStr }));
       }
     }
-  }, [form.dateDebut, form.nbMois]);
+    if (form.dateDebut && form.dossierId) {
+      const selectedYear = form.dateDebut.split('-')[0];
+      const currentDossier = dossiers.find(d => String(d.id) === String(form.dossierId));
+      if (currentDossier && formatYear(currentDossier.anneeStage) !== selectedYear) {
+        setForm(p => ({ ...p, dossierId: "", stagiaireId: null }));
+        setSujetInfo(null);
+        setBinomeInfo(null);
+      }
+    }
+  }, [form.dateDebut, form.nbMois, form.dossierId]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [s, st, enc, choices] = await Promise.all([
+      const [s, doss, enc] = await Promise.all([
         getAllStages(),
-        getByRole("ROLE_STAGIAIRE"),
-        getByRole("ROLE_ENCADRANT"),
-        getTousLesChoix()
+        getDossiersByResponsable(user.id, activeSession),
+        getByRole("ROLE_ENCADRANT")
       ]);
       setStages(s.data);
-      setStagiaires(st.data);
+      setDossiersList(doss.data);
       setEncadrants(enc.data);
 
-      const idsAyantStage = new Set();
+      const idsDossiersUtilises = new Set();
+      const idsStagiairesActifs = new Set(); // Stagiaires avec un stage EN_COURS ou EN_ATTENTE
+
       s.data.forEach(item => {
-        if (item.stagiaireId) idsAyantStage.add(item.stagiaireId);
-        if (item.stagiaire2Id) idsAyantStage.add(item.stagiaire2Id);
+        if (item.dossierId) idsDossiersUtilises.add(Number(item.dossierId));
+        if (item.dossier2Id) idsDossiersUtilises.add(Number(item.dossier2Id));
+        
+        if (item.statut === "EN_COURS" || item.statut === "EN_ATTENTE") {
+          if (item.stagiaireId) idsStagiairesActifs.add(Number(item.stagiaireId));
+          if (item.stagiaire2Id) idsStagiairesActifs.add(Number(item.stagiaire2Id));
+        }
       });
 
-      const idsAyantChoisi = new Set(choices.data.map(c => c.stagiaireId));
-      setStagiairesAyantChoisi(
-        st.data.filter(user => idsAyantChoisi.has(user.id) && !idsAyantStage.has(user.id))
+      // On affiche tous les dossiers qui n'ont pas encore de stage ET dont le stagiaire n'a pas de stage actif ailleurs
+      setDossiers(
+        doss.data.filter(d => 
+          !idsDossiersUtilises.has(Number(d.id)) && 
+          !idsStagiairesActifs.has(Number(d.stagiaireId))
+        )
       );
     } catch {
     } finally {
@@ -114,67 +146,70 @@ export default function GestionStages() {
     }
   };
 
-  const handleStagiaireChange = async (stagiaireId) => {
+  const handleDossierChange = async (dossierId) => {
+    const dossier = dossiers.find(d => String(d.id) === String(dossierId));
+    const stagiaireId = dossier?.stagiaireId;
+
     setForm((p) => ({
       ...p,
+      dossierId,
       stagiaireId,
       sujet: "",
       description: "",
-      dateDebut: "",
-      dateFin: "",
       type: "PFE",
       stagiaire2Id: null,
+      dossier2Id: null,
       sujetRefId: null,
     }));
     setSujetInfo(null);
     setBinomeInfo(null);
 
-    if (!stagiaireId) return;
+    if (!dossierId || !stagiaireId) return;
 
     setLoadingFill(true);
     try {
-      const { data: sujet } = await getSujetDuStagiaire(stagiaireId);
-      const defaultStart = sujet.dateDebut || new Date().toISOString().split("T")[0];
-      const defaultEnd = sujet.dateFin || "";
-      let months = "";
+      const { data: choix } = await getMonChoix(stagiaireId);
+      
+      setForm((p) => {
+        const defaultStart = p.dateDebut || new Date().toISOString().split("T")[0];
+        const defaultEnd = p.dateFin || "";
+        let months = p.nbMois;
 
-      if (defaultStart && defaultEnd) {
-        const s = new Date(defaultStart);
-        const e = new Date(defaultEnd);
-        months = Math.max(0, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()));
-      }
+        return {
+          ...p,
+          sujet: choix.sujetTitre,
+          description: choix.sujetDescription || "",
+          dateDebut: defaultStart,
+          dateFin: defaultEnd,
+          nbMois: months,
+          type: choix.sujetType || "PFE",
+          sujetRefId: choix.sujetId, // ID de la session occurrence
+        };
+      });
+      setSujetInfo({ titre: choix.sujetTitre, statut: choix.sujetStatut, id: choix.sujetId });
 
-      setForm((p) => ({
-        ...p,
-        sujet: sujet.titre,
-        description: sujet.description || "",
-        dateDebut: defaultStart,
-        dateFin: defaultEnd,
-        nbMois: months || p.nbMois,
-        type: sujet.type || "PFE",
-        sujetRefId: sujet.id,
-      }));
-      setSujetInfo(sujet);
+      // --- BINOME DETECTION ---
+      const { data: allChoix } = await getChoixBySession(choix.sujetId);
+      const binomeChoix = allChoix.find(c => Number(c.stagiaireId) !== Number(stagiaireId));
 
-      if (sujet.nbMaxStagiaires === 2 && sujet.nbChoixActuels === 2) {
-        const autresStagiaires = stagiaires.filter(
-          (s) => String(s.id) !== String(stagiaireId),
+      if (binomeChoix) {
+        // Find matching dossier for binome
+        const binomeDossier = dossiersList.find(d => 
+          Number(d.stagiaireId) === Number(binomeChoix.stagiaireId) && 
+          formatYear(d.anneeStage) === formatYear(dossier.anneeStage)
         );
 
-        let binomeTrouve = null;
-        for (const s of autresStagiaires) {
-          try {
-            const { data: choix } = await api.get(`/sujets/choix/stagiaire/${s.id}`);
-            if (choix && choix.sujetId === sujet.id) {
-              binomeTrouve = s;
-              break;
-            }
-          } catch { }
-        }
-
-        if (binomeTrouve) {
-          setBinomeInfo(binomeTrouve);
-          setForm((p) => ({ ...p, stagiaire2Id: binomeTrouve.id }));
+        if (binomeDossier) {
+          setForm(p => ({
+            ...p,
+            stagiaire2Id: binomeChoix.stagiaireId,
+            dossier2Id: binomeDossier.id
+          }));
+          setBinomeInfo({
+            prenom: binomeChoix.stagiairePrenom,
+            nom: binomeChoix.stagiaireNom,
+            email: binomeChoix.stagiaireEmail || "Étudiant partenaire"
+          });
         }
       }
     } catch {
@@ -187,6 +222,11 @@ export default function GestionStages() {
 
   const filtered = stages.filter((s) => {
     const matchStatut = statutFilter === "TOUS" || s.statut === statutFilter;
+    const yearOfStage = s.dateCreation 
+      ? (Array.isArray(s.dateCreation) ? s.dateCreation[0].toString() : new Date(s.dateCreation).getFullYear().toString())
+      : (s.dateDebut ? s.dateDebut.split('-')[0] : "");
+    const matchAnnee = anneeFilter === "TOUTES" || yearOfStage === anneeFilter;
+    
     const q = search.toLowerCase();
     const matchSearch =
       !search ||
@@ -194,8 +234,15 @@ export default function GestionStages() {
       s.stagiaireNom?.toLowerCase().includes(q) ||
       s.stagiairePrenom?.toLowerCase().includes(q) ||
       s.encadrantNom?.toLowerCase().includes(q);
-    return matchStatut && matchSearch;
+      
+    return matchStatut && matchAnnee && matchSearch;
   });
+
+  const availableYears = [...new Set(stages.map(s => 
+    s.dateCreation 
+      ? new Date(s.dateCreation).getFullYear().toString() 
+      : (s.dateDebut ? s.dateDebut.split('-')[0] : "")
+  ))].filter(Boolean).sort((a, b) => b - a);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -210,6 +257,8 @@ export default function GestionStages() {
         type: form.type,
         stagiaireId: Number(form.stagiaireId),
         stagiaire2Id: form.stagiaire2Id ? Number(form.stagiaire2Id) : null,
+        dossierId: form.dossierId ? Number(form.dossierId) : null,
+        dossier2Id: form.dossier2Id ? Number(form.dossier2Id) : null,
         encadrantId: Number(form.encadrantId),
         responsableId: user?.id,
         sujetRefId: form.sujetRefId,
@@ -219,14 +268,25 @@ export default function GestionStages() {
       setSujetInfo(null);
       setBinomeInfo(null);
       load();
+      ClinisysAlert.success("Stage lancé avec succès");
     } catch (err) {
-      setError(err.response?.data?.message || "Erreur lors de la création");
+      ClinisysAlert.error("Erreur", err.response?.data?.message || "Erreur lors de la création");
     } finally {
       setSaving(false);
     }
   };
 
   const f = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const handleDateChange = (e) => {
+    const val = e.target.value;
+    if (!val) return;
+    
+    // Force the year to match activeSession
+    const parts = val.split('-');
+    const fixedDate = `${activeSession}-${parts[1]}-${parts[2]}`;
+    setForm(p => ({ ...p, dateDebut: fixedDate }));
+  };
 
   return (
     <div className={`app-layout ${sidebarMini ? "sidebar-mini" : ""}`}>
@@ -250,7 +310,10 @@ export default function GestionStages() {
             onClick={() => {
               setShowModal(true);
               setError("");
-              setForm(EMPTY_FORM);
+              setForm({
+                ...EMPTY_FORM,
+                dateDebut: `${activeSession}-01-01`
+              });
               setSujetInfo(null);
               setBinomeInfo(null);
             }}
@@ -289,6 +352,19 @@ export default function GestionStages() {
                 ))}
               </select>
             </div>
+            <div style={{ position: 'relative', width: 180 }}>
+              <Calendar size={18} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
+              <select 
+                value={anneeFilter} 
+                onChange={e => setAnneeFilter(e.target.value)}
+                style={{ paddingLeft: 44, borderRadius: 12, background: 'var(--bg)', border: 'none', marginBottom: 0 }}
+              >
+                <option value="TOUTES">Toutes les années</option>
+                {availableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
             <button className="btn btn-outline" onClick={load} style={{ borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               <RefreshCw size={16} />
               <span>Actualiser</span>
@@ -316,7 +392,7 @@ export default function GestionStages() {
                 className="premium-card"
                 style={{ gridColumn: "1/-1", textAlign: "center", padding: 60 }}
               >
-                <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+                <div style={{ marginBottom: 16, color: 'var(--text-3)' }}><ClipboardList size={48} /></div>
                 <p style={{ color: "var(--text-3)", fontSize: 16 }}>Aucun stage ne correspond à vos critères.</p>
               </motion.div>
             ) : (
@@ -405,7 +481,17 @@ export default function GestionStages() {
                           whileTap={{ scale: 0.95 }}
                           className="btn btn-success"
                           style={{ flex: 1, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10 }}
-                          onClick={() => changerStatutStage(s.id, "VALIDE").then(load)}
+                          onClick={() => ClinisysAlert.confirm({
+                            title: "Valider le stage",
+                            text: "Confirmez-vous la validation de ce stage ?",
+                            confirmText: "Valider",
+                            icon: 'success'
+                          }).then(res => res.isConfirmed && changerStatutStage(s.id, "VALIDE").then(() => {
+                            load();
+                            ClinisysAlert.success("Stage validé avec succès");
+                          }).catch(err => {
+                            ClinisysAlert.error("Validation Impossible", err.response?.data?.message || "Le dernier sprint doit être clôturé avant de valider le stage.");
+                          }))}
                         >
                           <CheckCircle size={14} /> Valider
                         </motion.button>
@@ -416,7 +502,15 @@ export default function GestionStages() {
                           whileTap={{ scale: 0.95 }}
                           className="btn btn-danger"
                           style={{ flex: 1, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10 }}
-                          onClick={() => changerStatutStage(s.id, "INTERROMPU").then(load)}
+                          onClick={() => ClinisysAlert.confirm({
+                            title: "Interrompre le stage",
+                            text: "Êtes-vous sûr de vouloir interrompre ce stage ?",
+                            confirmText: "Interrompre",
+                            danger: true
+                          }).then(res => res.isConfirmed && changerStatutStage(s.id, "INTERROMPU").then(() => {
+                            load();
+                            ClinisysAlert.success("Stage interrompu");
+                          }))}
                         >
                           <XCircle size={14} /> Arrêter
                         </motion.button>
@@ -427,7 +521,15 @@ export default function GestionStages() {
                           whileTap={{ scale: 0.95 }}
                           className="btn btn-primary"
                           style={{ flex: 1, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10 }}
-                          onClick={() => changerStatutStage(s.id, "EN_COURS").then(load)}
+                          onClick={() => ClinisysAlert.confirm({
+                            title: "Reprendre le stage",
+                            text: "Voulez-vous redémarrer ce stage ?",
+                            confirmText: "Reprendre",
+                            icon: 'info'
+                          }).then(res => res.isConfirmed && changerStatutStage(s.id, "EN_COURS").then(() => {
+                            load();
+                            ClinisysAlert.success("Stage repris");
+                          }))}
                         >
                           <PlayCircle size={14} /> Reprendre
                         </motion.button>
@@ -436,7 +538,15 @@ export default function GestionStages() {
                         whileHover={{ scale: 1.1, color: 'var(--danger)' }}
                         whileTap={{ scale: 0.9 }}
                         style={{ background: 'var(--bg)', border: 'none', padding: 10, borderRadius: 10, color: 'var(--text-3)', cursor: 'pointer', transition: 'all 0.2s' }}
-                        onClick={() => deleteStage(s.id).then(load).catch(() => alert("Erreur"))}
+                        onClick={() => ClinisysAlert.confirm({
+                          title: "Supprimer le stage",
+                          text: "Cette action est irréversible. Supprimer ce stage ?",
+                          confirmText: "Supprimer",
+                          danger: true
+                        }).then(res => res.isConfirmed && deleteStage(s.id).then(() => {
+                          load();
+                          ClinisysAlert.success("Stage supprimé");
+                        }).catch(() => ClinisysAlert.error("Erreur", "Impossible de supprimer ce stage")))}
                       >
                         <Trash2 size={16} />
                       </motion.button>
@@ -472,13 +582,40 @@ export default function GestionStages() {
                 <form onSubmit={handleCreate} style={{ padding: 40 }}>
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                       <div className="form-group-v2">
-                         <label>Stagiaire Bénéficiaire</label>
-                         <select value={form.stagiaireId} onChange={(e) => handleStagiaireChange(e.target.value)} required>
-                            <option value="">— Sélectionner un profil stagiaire —</option>
-                            {stagiairesAyantChoisi.map((s) => (
-                              <option key={s.id} value={s.id}>{s.prenom} {s.nom} ({s.email})</option>
+                         <label>Dossier Stagiaire</label>
+                         <select value={form.dossierId} onChange={(e) => handleDossierChange(e.target.value)} required>
+                            <option value="">— Sélectionner un dossier —</option>
+                            {dossiers
+                              .filter(d => !form.dateDebut || formatYear(d.anneeStage) === form.dateDebut.split('-')[0])
+                              .map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.stagiairePrenom} {d.stagiaireNom} ({formatYear(d.anneeStage)} - {d.universite})
+                                </option>
                             ))}
                          </select>
+                      </div>
+
+                      <div className="form-group-v2">
+                         <label>Titre de la mission Stage</label>
+                         <input value={form.sujet} onChange={f("sujet")} required readOnly={sujetInfo?.statut === "VALIDE"} style={sujetInfo?.statut === "VALIDE" ? { background: 'var(--bg)', cursor: 'not-allowed', color: 'var(--text-3)' } : {}} />
+                      </div>
+                      
+                      <div className="grid-2" style={{ gap: 24 }}>
+                         <div className="form-group-v2">
+                            <label>Date de démarrage ({activeSession})</label>
+                            <input 
+                              type="date" 
+                              value={form.dateDebut} 
+                              onChange={handleDateChange} 
+                              min={`${activeSession}-01-01`}
+                              max={`${activeSession}-12-31`}
+                              required 
+                            />
+                         </div>
+                         <div className="form-group-v2">
+                            <label>Durée (Mois)</label>
+                            <input type="number" min="1" value={form.nbMois} onChange={f("nbMois")} required />
+                         </div>
                       </div>
 
                       {loadingFill && (
@@ -515,37 +652,23 @@ export default function GestionStages() {
                       )}
 
                       <div style={{ opacity: form.stagiaireId ? 1 : 0.4, pointerEvents: form.stagiaireId ? "all" : "none", transition: 'all 0.3s' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                           <div className="form-group-v2">
-                              <label>Titre de la mission Stage</label>
-                              <input value={form.sujet} onChange={f("sujet")} required readOnly={sujetInfo?.statut === "VALIDE"} style={sujetInfo?.statut === "VALIDE" ? { background: 'var(--bg)', cursor: 'not-allowed', color: 'var(--text-3)' } : {}} />
-                           </div>
-                           <div className="grid-2" style={{ gap: 24 }}>
-                              <div className="form-group-v2">
-                                 <label>Date de démarrage</label>
-                                 <input type="date" value={form.dateDebut} onChange={f("dateDebut")} required />
-                              </div>
-                              <div className="form-group-v2">
-                                 <label>Durée (Mois)</label>
-                                 <input type="number" min="1" value={form.nbMois} onChange={f("nbMois")} required />
-                              </div>
-                           </div>
-                           <div className="grid-2" style={{ gap: 24 }}>
-                              <div className="form-group-v2">
-                                 <label>Type de Stage</label>
-                                 <select value={form.type} onChange={f("type")} required>
-                                    {Object.entries(TYPE_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                                 </select>
-                              </div>
-                              <div className="form-group-v2">
-                                 <label>Encadrant Clinisys</label>
-                                 <select value={form.encadrantId} onChange={f("encadrantId")} required>
-                                    <option value="">— Sélectionner —</option>
-                                    {encadrants.map(en => <option key={en.id} value={en.id}>{en.prenom} {en.nom}</option>)}
-                                 </select>
-                              </div>
-                           </div>
-                        </div>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            <div className="grid-2" style={{ gap: 24 }}>
+                               <div className="form-group-v2">
+                                  <label>Type de Stage</label>
+                                  <select value={form.type} onChange={f("type")} required disabled={!!form.stagiaireId} style={form.stagiaireId ? { background: 'var(--bg)', cursor: 'not-allowed', color: 'var(--text-3)' } : {}}>
+                                     {Object.entries(TYPE_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                                  </select>
+                               </div>
+                               <div className="form-group-v2">
+                                  <label>Encadrant Clinisys</label>
+                                  <select value={form.encadrantId} onChange={f("encadrantId")} required>
+                                     <option value="">— Sélectionner —</option>
+                                     {encadrants.map(en => <option key={en.id} value={en.id}>{en.prenom} {en.nom}</option>)}
+                                  </select>
+                               </div>
+                            </div>
+                         </div>
                       </div>
                    </div>
 

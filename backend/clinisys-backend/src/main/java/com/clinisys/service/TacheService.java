@@ -33,6 +33,9 @@ public class TacheService {
         Stage stage = stageRepository.findById(req.getStageId())
                 .orElseThrow(() -> new RuntimeException("Stage non trouvé"));
 
+        if (stage.getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Modification des tâches impossible.");
+
         Tache tache = new Tache();
         tache.setTitre(req.getTitre());
         tache.setDescription(req.getDescription());
@@ -60,6 +63,9 @@ public class TacheService {
                 .orElseThrow(() -> new RuntimeException("Tâche non trouvée"));
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new RuntimeException("Sprint non trouvé"));
+
+        if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Affectation impossible.");
 
         boolean dejaAffectee = tacheRepository.findBySprintId(sprintId)
                 .stream().anyMatch(ts -> ts.getTache() != null
@@ -110,6 +116,9 @@ public class TacheService {
     public TacheSprintResponse creer(TacheRequest req) {
         Sprint sprint = sprintRepository.findById(req.getSprintId())
                 .orElseThrow(() -> new RuntimeException("Sprint non trouvé"));
+
+        if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Création de tâche impossible.");
 
         Tache tache = new Tache();
         tache.setTitre(req.getTitre());
@@ -168,6 +177,10 @@ public class TacheService {
     public TacheSprintResponse proposer(TacheRequest req, Long stagiaireId) {
         Sprint sprint = sprintRepository.findById(req.getSprintId())
                 .orElseThrow(() -> new RuntimeException("Sprint non trouvé"));
+
+        if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Proposition de tâche impossible.");
+
         Stagiaire stagiaire = stagiaireRepository.findById(stagiaireId)
                 .orElseThrow(() -> new RuntimeException("Stagiaire non trouvé"));
 
@@ -207,6 +220,9 @@ public class TacheService {
     @Transactional
     public TacheSprintResponse valider(Long id) {
         TacheSprint ts = getTS(id);
+        if (ts.getSprint().getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Action bloquée.");
+            
         if (ts.getStatut() != StatutTache.EN_ATTENTE_VALIDATION)
             throw new RuntimeException("La tâche n'est pas en attente de validation");
         ts.setStatut(StatutTache.A_FAIRE);
@@ -257,6 +273,9 @@ public class TacheService {
         if (commentaire == null || commentaire.isBlank())
             throw new RuntimeException("Un commentaire est requis");
         TacheSprint ts = getTS(id);
+        if (ts.getSprint().getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Action bloquée.");
+            
         ts.setStatut(StatutTache.REFUSE);
         ts.setCommentaire(commentaire);
         return toSprintResponse(tacheRepository.save(ts));
@@ -267,6 +286,9 @@ public class TacheService {
     @Transactional
     public TacheSprintResponse mettreAJour(Long id, TacheUpdateRequest req) {
         TacheSprint ts = getTS(id);
+        if (ts.getSprint().getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Mise à jour impossible.");
+
         if (req.getStatut() != null) {
             verifierTransition(ts.getStatut(), req.getStatut());
 
@@ -380,6 +402,14 @@ public class TacheService {
     public void retirerTacheDuSprint(Long tacheSprintId) {
         TacheSprint ts = tacheRepository.findById(tacheSprintId)
                 .orElseThrow(() -> new RuntimeException("Affectation non trouvée"));
+        
+        if (ts.getSprint().getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Action impossible.");
+
+        if (ts.getStatut() != StatutTache.A_FAIRE && ts.getStatut() != StatutTache.EN_ATTENTE_VALIDATION) {
+            throw new RuntimeException("Seules les tâches à l'état 'À Faire' ou 'En Attente' peuvent être retirées du sprint.");
+        }
+
         Long sprintId = ts.getSprint().getId();
         Long tacheId = ts.getTache().getId();
 
@@ -400,6 +430,13 @@ public class TacheService {
     @Transactional
     public void delete(Long id) {
         TacheSprint ts = getTS(id);
+        if (ts.getSprint().getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Suppression impossible.");
+
+        if (ts.getStatut() != StatutTache.A_FAIRE && ts.getStatut() != StatutTache.EN_ATTENTE_VALIDATION) {
+            throw new RuntimeException("Seules les tâches à l'état 'À Faire' ou 'En Attente' peuvent être supprimées du sprint.");
+        }
+
         Long sprintId = ts.getSprint().getId();
         Long tacheId = ts.getTache().getId();
 
@@ -418,6 +455,17 @@ public class TacheService {
 
     @Transactional
     public void deleteTacheSimple(Long tacheId) {
+        Tache t = tacheBaseRepository.findById(tacheId).orElse(null);
+        if (t != null && t.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Suppression impossible.");
+
+        // ✅ Sécurité : ne pas supprimer une tâche qui est affectée à un sprint
+        boolean estAffectee = !tacheRepository.findByStageId(t.getStage().getId()).stream()
+                .filter(ts -> ts.getTache().getId().equals(tacheId)).toList().isEmpty();
+        if (estAffectee) {
+            throw new RuntimeException("Impossible de supprimer cette tâche car elle est actuellement affectée à un sprint. Retirez-la d'abord du sprint.");
+        }
+            
         tacheBaseRepository.deleteById(tacheId);
     }
 
@@ -450,6 +498,15 @@ public class TacheService {
         if (t.getStage() != null) {
             r.setStageId(t.getStage().getId());
             r.setStageSujet(t.getStage().getSujet());
+            if (t.getStage().getDossier() != null) {
+                r.setAnnee(t.getStage().getDossier().getAnneeStage());
+            } else if (t.getStage().getSujetSession() != null) {
+                r.setAnnee(t.getStage().getSujetSession().getAnnee());
+            }
+
+            if (r.getAnnee() == null && t.getStage().getDateDebut() != null) {
+                r.setAnnee(String.valueOf(t.getStage().getDateDebut().getYear()));
+            }
         }
         return r;
     }
@@ -475,6 +532,17 @@ public class TacheService {
             r.setSprintId(ts.getSprint().getId());
             r.setSprintNom(ts.getSprint().getNom());
             r.setSprintStatut(ts.getSprint().getStatut() != null ? ts.getSprint().getStatut().name() : null);
+            if (ts.getSprint().getStage() != null) {
+                if (ts.getSprint().getStage().getDossier() != null) {
+                    r.setAnnee(ts.getSprint().getStage().getDossier().getAnneeStage());
+                } else if (ts.getSprint().getStage().getSujetSession() != null) {
+                    r.setAnnee(ts.getSprint().getStage().getSujetSession().getAnnee());
+                }
+
+                if (r.getAnnee() == null && ts.getSprint().getStage().getDateDebut() != null) {
+                    r.setAnnee(String.valueOf(ts.getSprint().getStage().getDateDebut().getYear()));
+                }
+            }
         }
         if (ts.getStagiaire() != null) {
             r.setStagiaireId(ts.getStagiaire().getId());

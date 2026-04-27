@@ -12,21 +12,19 @@ import {
   reporterReunion,
 } from "../../api/reunionAPI";
 import { getStagesByStagiaire } from "../../api/stageAPI";
-import { 
-  Calendar, Clock, MapPin, Search, 
-  Filter, Plus, CheckCircle, XCircle, 
-  FileText, Activity, Layers, Info, 
-  ChevronRight, ArrowRight, RefreshCw, 
-  Send, User, AlertCircle, Sparkles
+import {
+  Send, User, AlertCircle, Sparkles,
+  LayoutDashboard, FileText, RefreshCw, CheckCircle, Calendar, Star, Plus, MapPin, XCircle, Clock, Activity, Info
 } from 'lucide-react';
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/stagiaire/dashboard", icon: "⊞", label: "Mon espace" },
-  { path: "/stagiaire/sujets", icon: "📝", label: "Sujets" },
-  { path: "/stagiaire/sprints", icon: "🔄", label: "Mes sprints" },
-  { path: "/stagiaire/taches", icon: "✅", label: "Mes tâches" },
-  { path: "/stagiaire/reunions", icon: "📅", label: "Mes réunions" },
-  { path: "/stagiaire/evaluations", icon: "⭐", label: "Mes évaluations" },
+  { path: "/stagiaire/dashboard", icon: <LayoutDashboard size={18} />, label: "Mon espace" },
+  { path: "/stagiaire/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/stagiaire/sprints", icon: <RefreshCw size={18} />, label: "Mes sprints" },
+  { path: "/stagiaire/taches", icon: <CheckCircle size={18} />, label: "Mes tâches" },
+  { path: "/stagiaire/reunions", icon: <Calendar size={18} />, label: "Mes réunions" },
+  { path: "/stagiaire/evaluations", icon: <Star size={18} />, label: "Mes évaluations" },
 ];
 
 const STATUT_CONFIG = {
@@ -41,6 +39,7 @@ const STATUT_CONFIG = {
 export default function MesReunions() {
   const { user } = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [reunions, setReunions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,14 +54,15 @@ export default function MesReunions() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportForm, setReportForm] = useState({ motif: "", nouvelleDate: "" });
 
-  useEffect(() => { if (user?.id) loadAll(); }, [user]);
+  useEffect(() => { if (user?.id) loadAll(); }, [user, activeSession]);
 
   const loadAll = async () => {
     setLoading(true);
     try {
       const [reunionsRes, stagesRes] = await Promise.all([ getReunionsByStagiaire(user.id), getStagesByStagiaire(user.id) ]);
       setReunions(Array.isArray(reunionsRes.data) ? reunionsRes.data : []);
-      const actif = (stagesRes.data || []).find(s => s.statut === "EN_COURS" || s.statut === "EN_ATTENTE") || stagesRes.data?.[0];
+      const stages = (stagesRes.data || []).filter(s => !s.annee || String(s.annee) === String(activeSession));
+      const actif = stages.find(s => s.statut === "EN_COURS" || s.statut === "EN_ATTENTE") || stages[0];
       setStageActif(actif || null);
     } catch {} finally { setLoading(false); }
   };
@@ -85,7 +85,14 @@ export default function MesReunions() {
     } catch {} finally { setSaving(false); }
   };
 
-  const filtered = filter === "TOUS" ? reunions : reunions.filter((r) => r.statut === filter);
+  const filtered = reunions.filter((r) => {
+    if (filter !== "TOUS" && r.statut !== filter) return false;
+    if (!activeSession) return true;
+    const sessionStr = String(activeSession);
+    if (r.annee) return String(r.annee) === sessionStr;
+    if (r.stageId === stageActif?.id) return true; // Si c'est le stage actif de la session, on affiche
+    return false;
+  });
   const f = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
   return (
@@ -99,9 +106,14 @@ export default function MesReunions() {
               <h1 className="gradient-text">Agenda Management</h1>
               <p>Sincronisez vos sessions de travail technique</p>
            </div>
-           <button className="btn btn-primary elite-btn" onClick={() => setShowModal(true)}>
-              <Plus size={18} /> <span>Proposer une Session</span>
-           </button>
+           {stageActif?.statut !== 'VALIDE' && (
+             <button className="btn btn-primary elite-btn" onClick={() => setShowModal(true)}>
+                <Plus size={18} /> <span>Proposer une Session</span>
+             </button>
+           )}
+           {stageActif?.statut === 'VALIDE' && (
+             <div className="locked-badge-st-v3"><CheckCircle size={14} /> ARCHIVES SCELLÉES</div>
+           )}
         </header>
 
         <div className="agenda-orchestration-v3">
@@ -217,24 +229,25 @@ export default function MesReunions() {
                       </div>
 
                       <div className="session-actions-v3">
-                         {(selected.statut === "PROPOSEE" || selected.statut === "PLANIFIEE") && (
-                           <div className="primary-actions">
-                              {((selected.stagiaireId === user.id && !selected.acceptationStagiaire1) || 
-                               (selected.stagiaire2Id === user.id && !selected.acceptationStagiaire2)) && (
-                                <button className="btn btn-success elite-btn-full" onClick={() => handleAccepter(selected.id)} disabled={saving}>
-                                   {saving ? "Synchronisation..." : "Confirmer Session"}
-                                </button>
+                        {stageActif?.statut === 'VALIDE' ? (
+                           <div className="locked-badge-v3-st"><Sparkles size={14} /> SESSION TERMINÉE</div>
+                        ) : (
+                           <>
+                              {(selected.statut === "PROPOSEE" || selected.statut === "PLANIFIEE") && (
+                                <div className="primary-actions">
+                                   {((selected.stagiaireId === user.id && !selected.acceptationStagiaire1) || 
+                                    (selected.stagiaire2Id === user.id && !selected.acceptationStagiaire2)) && (
+                                     <button className="btn btn-success elite-btn-full" onClick={() => handleAccepter(selected.id)} disabled={saving}>
+                                        {saving ? "Synchronisation..." : "Confirmer Session"}
+                                     </button>
+                                   )}
+                                   <button className="btn btn-outline full-width" onClick={() => { setReportForm({ motif:"", nouvelleDate: selected.dateHeure }); setShowReportModal(true); }}>
+                                      Demander Report
+                                   </button>
+                                </div>
                               )}
-                              <button className="btn btn-outline full-width" onClick={() => { setReportForm({ motif:"", nouvelleDate: selected.dateHeure }); setShowReportModal(true); }}>
-                                 Demander Report
-                              </button>
-                           </div>
-                         )}
-                         {selected.statut === "PLANIFIEE" && (
-                           <button className="btn-cancel-link" onClick={() => deleteReunion(selected.id).then(loadAll)}>
-                             Désistement (Annuler Réunion)
-                           </button>
-                         )}
+                           </>
+                        )}
                       </div>
                    </motion.div>
                  ) : (
@@ -367,6 +380,8 @@ export default function MesReunions() {
         .session-placeholder-v3 { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px; color: var(--text-3); }
         .pulse-icon { margin-bottom: 24px; transform: scale(1.2); opacity: 0.1; }
         .session-placeholder-v3 h3 { color: var(--text); font-size: 20px; font-weight: 900; margin-bottom: 12px; }
+        .locked-badge-st-v3 { display: flex; align-items: center; gap: 8px; padding: 10px 24px; background: var(--bg-alpha); color: var(--text-3); border-radius: 14px; font-size: 11px; font-weight: 900; letter-spacing: 1px; border: 1.5px solid var(--border); }
+        .locked-badge-v3-st { display: flex; align-items: center; gap: 8px; padding: 14px; background: var(--primary-light-alpha); color: var(--primary); border-radius: 12px; font-size: 11px; font-weight: 900; border: 1.5px solid var(--primary-light-alpha); justify-content: center; }
       ` }} />
     </div>
   );

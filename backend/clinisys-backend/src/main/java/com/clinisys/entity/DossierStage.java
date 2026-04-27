@@ -29,6 +29,9 @@ public class DossierStage {
     @Column(nullable = false)
     private String anneeStage; // Ex: "2025-2026"
 
+    private String cvPath;
+    private String portfolioPath;
+
     private LocalDateTime dateCreation;
 
     @PrePersist

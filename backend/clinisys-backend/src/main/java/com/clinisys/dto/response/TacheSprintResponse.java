@@ -29,4 +29,5 @@ public class TacheSprintResponse {
     private Long   sprintId;
     private String sprintNom;
     private String sprintStatut;
+    private String annee;
 }

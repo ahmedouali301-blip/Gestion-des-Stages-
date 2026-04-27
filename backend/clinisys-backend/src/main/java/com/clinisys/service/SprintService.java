@@ -33,6 +33,9 @@ public class SprintService {
         Stage stage = stageRepository.findById(req.getStageId())
                 .orElseThrow(() -> new RuntimeException("Stage non trouvé"));
 
+        if (stage.getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Impossible de modifier un stage déjà validé. Tout est bloqué.");
+
         if (req.getDateFin().isBefore(req.getDateDebut()))
             throw new RuntimeException("La date de fin doit être après la date de début");
 
@@ -172,6 +175,9 @@ public class SprintService {
 
     public SprintResponse demarrerSprint(Long id) {
         Sprint sprint = getSprint(id);
+        if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Aucune modification possible.");
+            
         if (sprint.getStatut() != StatutSprint.PLANIFIE)
             throw new RuntimeException("Seul un sprint PLANIFIÉ peut être démarré");
         sprint.setStatut(StatutSprint.EN_COURS);
@@ -180,6 +186,9 @@ public class SprintService {
 
     public SprintResponse cloturerSprint(Long id, boolean force) {
         Sprint sprint  = getSprint(id);
+        if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Aucune modification possible.");
+
         long total     = tacheRepository.countBySprintId(id);
         long terminees = tacheRepository.countTermineesBySprintId(id);
 
@@ -229,9 +238,29 @@ public class SprintService {
     }
 
     public void delete(Long id) {
-        if (!sprintRepository.existsById(id))
-            throw new RuntimeException("Sprint non trouvé");
+        Sprint sprint = getSprint(id);
+        if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
+            throw new RuntimeException("Le stage est déjà validé. Suppression impossible.");
+
+        // RÈGLE : Uniquement si PLANIFIE
+        if (sprint.getStatut() != StatutSprint.PLANIFIE) {
+            throw new RuntimeException("Impossible de supprimer un sprint qui n'est plus à l'état 'Planifié'.");
+        }
+
+        // RÈGLE : Uniquement si VIDE
+        long nbTaches = tacheRepository.countBySprintId(id);
+        if (nbTaches > 0) {
+            throw new RuntimeException("Impossible de supprimer ce sprint car il contient encore des tâches affectées.");
+        }
+
+        // Nettoyage des réunions automatiques liées
+        List<Reunion> reunions = reunionRepository.findBySprintId(id);
+        if (!reunions.isEmpty()) {
+            reunionRepository.deleteAll(reunions);
+        }
+
         sprintRepository.deleteById(id);
+        mouvementService.enregistrer("Suppression du sprint " + sprint.getNumero() + " (" + sprint.getNom() + ")", "SPRINT_SUPPRIME", null);
     }
 
     private Sprint getSprint(Long id) {

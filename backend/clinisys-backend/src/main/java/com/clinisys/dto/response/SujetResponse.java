@@ -14,9 +14,9 @@ public class SujetResponse {
     private Integer nbMaxStagiaires;
     private int nbChoixActuels;
     private boolean estComplet;
-    private String statut;
     private LocalDateTime dateCreation;
     private Long responsableId;
     private String responsableNom;
     private List<String> stagiairesPrenomNom;
+    private boolean published;
 }

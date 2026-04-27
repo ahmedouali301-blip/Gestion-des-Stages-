@@ -13,19 +13,18 @@ import {
   affecterTacheASprint, retirerTacheDuSprint,
 } from '../../api/tacheAPI';
 import { getStageById } from '../../api/stageAPI';
-import ConfirmModal from '../../components/common/ConfirmModal';
-import { 
-  Rocket, Calendar, CheckSquare, ChevronLeft, 
-  ChevronDown, ChevronUp, Plus, Trash2, 
-  Play, StopCircle, Layers, Users, 
-  Target, Info, AlertCircle, Clock, RefreshCw
+import ClinisysAlert from '../../utils/SwalUtils';
+import {
+  Target, Info, AlertCircle, Clock, RefreshCw,
+  LayoutDashboard, ClipboardList, FileText, Star, Calendar, ChevronLeft, ChevronUp, ChevronDown, CheckSquare, Layers, Play, StopCircle, Rocket, Users, Plus, Trash2
 } from 'lucide-react';
 
 const NAV = [
-  { path: '/encadrant/dashboard',   icon: '⊞', label: 'Tableau de bord' },
-  { path: '/encadrant/stages',      icon: '📋', label: 'Mes stages'      },
-  { path: '/encadrant/reunions',    icon: '📅', label: 'Réunions'        },
-  { path: '/encadrant/evaluations', icon: '⭐', label: 'Évaluations'     },
+  { path: '/encadrant/dashboard',   icon: <LayoutDashboard size={18} />, label: 'Tableau de bord' },
+  { path: '/encadrant/stages',      icon: <ClipboardList size={18} />, label: 'Mes stages'      },
+  { path: '/encadrant/sujets',      icon: <FileText size={18} />, label: 'Sujets'          },
+  { path: '/encadrant/reunions',    icon: <Calendar size={18} />, label: 'Réunions'        },
+  { path: '/encadrant/evaluations', icon: <Star size={18} />, label: 'Évaluations'     },
 ];
 
 const STATUT_SPRINT = {
@@ -41,6 +40,7 @@ const STATUT_TACHE = {
   EN_COURS:              { label:'En cours', color:'#6366f1', bg:'rgba(99,102,241,0.1)' },
   TERMINE:               { label:'Terminé',  color:'#10b981', bg:'rgba(16,185,129,0.1)' },
   REFUSE:                { label:'Refusé',   color:'#ef4444', bg:'rgba(239,68,68,0.1)' },
+  REPORTEE:              { label:'Reporter',  color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
 };
 
 const PRIORITE_COLORS = { BASSE:'#3b82f6', MOYENNE:'#10b981', HAUTE:'#f59e0b', CRITIQUE:'#ef4444' };
@@ -88,9 +88,7 @@ export default function SprintManager() {
   const [savingAff,    setSavingAff]    = useState(false);
   const [errorAff,     setErrorAff]     = useState('');
 
-  const [confirm, setConfirm] = useState({ isOpen: false, title: '', message: '', confirmText: 'Confirmer', type: 'primary', onConfirm: () => {}, loading: false });
 
-  const closeConfirm = () => setConfirm(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => { loadAll(); }, [stageId]);
 
@@ -142,6 +140,7 @@ export default function SprintManager() {
 
       await creerSprint({ ...sprintForm, stageId: Number(stageId), numero: Number(sprintForm.numero), datesMots: datesValides });
       setShowModal(false); setSprintForm(EMPTY_SPRINT); setDatesMots([]); loadAll();
+      ClinisysAlert.success("Sprint créé avec succès");
     } catch (err) {
       let msg = err.response?.data?.message || err.message || 'Erreur création sprint';
       
@@ -152,7 +151,7 @@ export default function SprintManager() {
         msg = "Action refusée : Vérifiez la cohérence des dates ou si un cycle est déjà actif.";
       }
       
-      setErrorModal(msg);
+      ClinisysAlert.error("Erreur Sprint", msg);
     } finally { setSaving(false); }
   };
 
@@ -167,7 +166,21 @@ export default function SprintManager() {
     const val = e.target.value;
     setSprintForm(p => {
       const updated = { ...p, [k]: val };
-      if (k === 'dateDebut' || k === 'nbJours') updated.dateFin = calculateDateFin(updated.dateDebut, updated.nbJours);
+      if (k === 'dateDebut' || k === 'nbJours') {
+        const oldDateFin = updated.dateFin;
+        updated.dateFin = calculateDateFin(updated.dateDebut, updated.nbJours);
+        
+        // Sync first meeting date if it was still on the previous end date
+        setDatesMots(prev => {
+          if (prev.length > 0 && (prev[0].startsWith(oldDateFin) || prev[0] === "")) {
+            const nextDates = [...prev];
+            const timePart = prev[0].includes('T') ? prev[0].split('T')[1] : "09:00";
+            nextDates[0] = `${updated.dateFin}T${timePart}`;
+            return nextDates;
+          }
+          return prev;
+        });
+      }
       return updated;
     });
   };
@@ -176,31 +189,31 @@ export default function SprintManager() {
     try {
       await cloturerSprint(sprintId, false);
       loadAll();
+      ClinisysAlert.success("Sprint clôturé");
     } catch (err) {
       const msg = err.response?.data?.message || '';
-      if (err.response?.status === 409 && msg.startsWith('SPRINT_INCOMPLET:')) {
+      if (err.test) { // Not used, just to align
+      } else if (err.response?.status === 409 && msg.startsWith('SPRINT_INCOMPLET:')) {
         const parts = msg.replace('SPRINT_INCOMPLET:', '').split('/');
         const done = parts[0], total = parts[1];
-        setConfirm({
-          isOpen: true,
+        ClinisysAlert.confirm({
           title: 'Sprint incomplet',
-          message: `Seulement ${done}/${total} tâches sont terminées. Voulez-vous forcer la clôture malgré les tâches en cours ?`,
+          text: `Seulement ${done}/${total} tâches sont terminées. Voulez-vous forcer la clôture malgré les tâches en cours ?`,
           confirmText: 'Forcer la clôture',
-          type: 'danger',
-          loading: false,
-          onConfirm: async () => {
-            setConfirm(p => ({ ...p, loading: true }));
+          danger: true
+        }).then(async (result) => {
+          if (result.isConfirmed) {
             try {
               await cloturerSprint(sprintId, true);
               loadAll();
-              closeConfirm();
+              ClinisysAlert.success("Sprint clôturé avec succès");
             } catch {
-              closeConfirm();
+              ClinisysAlert.error("Erreur", "Impossible de clôturer le sprint");
             }
           }
         });
       } else {
-        alert(err.response?.data?.message || 'Erreur lors de la clôture du sprint');
+        ClinisysAlert.error("Erreur", err.response?.data?.message || 'Erreur lors de la clôture du sprint');
       }
     }
   };
@@ -217,15 +230,17 @@ export default function SprintManager() {
       nextStart = d.toISOString().split('T')[0];
     }
 
+    const nextDateFin = calculateDateFin(nextStart, 15);
     setSprintForm({
       ...EMPTY_SPRINT,
       numero: nextIdx,
       nom: `Sprint ${nextIdx}`,
       dateDebut: nextStart,
       nbJours: 15, // Valeur par défaut standard
-      dateFin: calculateDateFin(nextStart, 15)
+      dateFin: nextDateFin
     });
-    setDatesMots([]);
+    // Par défaut, la session de suivi est à la date de sortie (dateFin) à 09:00
+    setDatesMots([`${nextDateFin}T09:00`]);
     setShowModal(true);
   };
 
@@ -237,7 +252,7 @@ export default function SprintManager() {
       setTachesDisponibles(data);
       setShowAffecter(true);
     } catch (err) {
-      alert("Erreur lors de la récupération des tâches");
+      ClinisysAlert.error("Erreur", "Impossible de charger les tâches");
     }
   };
 
@@ -264,9 +279,11 @@ export default function SprintManager() {
               <button className="btn btn-outline elite-btn-ghost" onClick={() => navigate(`/encadrant/taches/${stageId}`)}>
                  <CheckSquare size={18} /> <span>Backlog Projet</span>
               </button>
-               <button className="btn btn-primary elite-btn" onClick={openAddSprintModal}>
-                  <Plus size={18} /> <span>New Sprint</span>
-               </button>
+              {stage?.statut !== 'VALIDE' && (
+                 <button className="btn btn-primary elite-btn" onClick={openAddSprintModal}>
+                    <Plus size={18} /> <span>New Sprint</span>
+                 </button>
+              )}
            </div>
         </header>
 
@@ -284,10 +301,12 @@ export default function SprintManager() {
           </div>
         ) : sprints.length === 0 ? (
           <div className="empty-manager-state">
-             <div className="icon-pulse"><Rocket size={64} /></div>
+             <div className="icon-pulse" style={{ color: 'var(--primary)', marginBottom: 24, opacity: 0.2 }}><Rocket size={64} /></div>
              <h3>Aucun pipeline détecté</h3>
              <p>Initialisez votre premier cycle de sprint pour commencer le suivi technique.</p>
-             <button className="btn btn-primary elite-btn" style={{marginTop:24}} onClick={openAddSprintModal}>Développer Sprint 1</button>
+             {stage?.statut !== 'VALIDE' && (
+                <button className="btn btn-primary elite-btn" style={{marginTop:24}} onClick={openAddSprintModal}>Développer Sprint 1</button>
+             )}
           </div>
         ) : (
           <div className="sprint-pipeline">
@@ -345,10 +364,37 @@ export default function SprintManager() {
                                 <p>{sprint.objectifs || "Aucun objectif spécifié."}</p>
                              </div>
                              <div className="sprint-actions-hub">
-                                {sprint.statut === 'PLANIFIE' && <button className="hub-btn primary" onClick={() => demarrerSprint(sprint.id).then(loadAll)}><Play size={14} /> Lancer</button>}
-                                {sprint.statut === 'EN_COURS' && <button className="hub-btn success" onClick={() => handleCloturerSprint(sprint.id)}><StopCircle size={14} /> Clôturer</button>}
-                                <button className="hub-btn ghost" onClick={() => openAffecter(sprint)}><Plus size={14} /> Affecter Tâches</button>
-                                <button className="hub-btn danger-ghost" onClick={() => deleteSprint(sprint.id).then(loadAll)}><Trash2 size={14} /></button>
+                                 {stage?.statut !== 'VALIDE' && (
+                                   <>
+                                      {sprint.statut === 'PLANIFIE' && (
+                                        <button className="hub-btn primary" onClick={() => ClinisysAlert.confirm({
+                                          title: "Démarrer le sprint",
+                                          text: "Confirmez-vous le lancement de ce cycle ?",
+                                          confirmText: "Démarrer",
+                                          icon: 'info'
+                                        }).then(res => res.isConfirmed && demarrerSprint(sprint.id).then(() => {
+                                          loadAll();
+                                          ClinisysAlert.success("Sprint démarré");
+                                        }))}><Play size={14} /> Lancer</button>
+                                      )}
+                                      {sprint.statut === 'EN_COURS' && <button className="hub-btn success" onClick={() => handleCloturerSprint(sprint.id)}><StopCircle size={14} /> Clôturer</button>}
+                                      <button className="hub-btn ghost" onClick={() => openAffecter(sprint)}><Plus size={14} /> Affecter Tâches</button>
+                                      {sprint.statut === 'PLANIFIE' && sprint.nbTaches === 0 && (
+                                        <button className="hub-btn danger-ghost" onClick={() => ClinisysAlert.confirm({
+                                        title: "Supprimer le sprint vide",
+                                        text: "Voulez-vous supprimer ce sprint vide ? Cette action supprimera également les séances de suivi associées.",
+                                        confirmText: "Supprimer",
+                                        danger: true
+                                      }).then(res => res.isConfirmed && deleteSprint(sprint.id).then(() => {
+                                        loadAll();
+                                        ClinisysAlert.success("Sprint supprimé");
+                                      }))}><Trash2 size={14} /></button>
+                                      )}
+                                   </>
+                                 )}
+                                 {stage?.statut === 'VALIDE' && (
+                                   <div className="locked-badge"><Rocket size={14} /> ARCHIVES SCELLÉES</div>
+                                 )}
                              </div>
                           </div>
 
@@ -375,7 +421,17 @@ export default function SprintManager() {
                                                <div className="t-assignees">
                                                   {t.stagiairesNoms?.map((n, i) => <span key={i} className="a-badge"><Users size={10} /> {n}</span>)}
                                                </div>
-                                               <button className="remove-t-btn" onClick={() => retirerTacheDuSprint(t.id).then(() => loadTaches(sprint.id))}><Trash2 size={12} /></button>
+                                                {stage?.statut !== 'VALIDE' && t.statut === 'A_FAIRE' && (
+                                                  <button className="remove-t-btn" onClick={() => ClinisysAlert.confirm({
+                                                    title: "Retirer la tâche",
+                                                    text: "Voulez-vous dissocier cette tâche du sprint ?",
+                                                    confirmText: "Retirer",
+                                                    danger: true
+                                                  }).then(res => res.isConfirmed && retirerTacheDuSprint(t.id).then(() => {
+                                                    loadTaches(sprint.id);
+                                                    ClinisysAlert.success("Tâche retirée");
+                                                  }))}><Trash2 size={12} /></button>
+                                                )}
                                             </div>
                                          </div>
                                       </div>
@@ -424,7 +480,15 @@ export default function SprintManager() {
                         </div>
                         <div className="form-group-v3">
                            <label>Durée (jours)</label>
-                           <input type="number" value={sprintForm.nbJours} onChange={sf('nbJours')} required />
+                           <input 
+                             type="number" 
+                             step="1" 
+                             min="1"
+                             value={sprintForm.nbJours} 
+                             onChange={sf('nbJours')} 
+                             onKeyPress={(e) => { if(!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                             required 
+                           />
                         </div>
                         <div className="form-group-v3">
                            <label>Sortie Prévue</label>
@@ -492,21 +556,34 @@ export default function SprintManager() {
                     {tachesDisponibles.map(t => (
                       <div key={t.id} className={`t-select-item ${tachesSelectionnees.includes(t.id) ? 'selected' : ''}`}
                            onClick={() => setTachesSelectionnees(prev => prev.includes(t.id) ? prev.filter(x => x !== t.id) : [...prev, t.id])}>
-                         <div className="checkbox-elite" />
-                         <div className="t-info">
-                            <span className="name">{t.titre}</span>
-                            <span className="prio" style={{ color: PRIORITE_COLORS[t.priorite] }}>{t.priorite}</span>
-                         </div>
+                          <div className="checkbox-elite" />
+                          <div className="t-info">
+                             <span className="name">{t.titre}</span>
+                             <span className="prio" style={{ color: PRIORITE_COLORS[t.priorite] }}>{t.priorite}</span>
+                          </div>
                       </div>
                     ))}
                   </div>
                   <div className="modal-actions-v3">
                      <button type="button" className="btn btn-ghost" onClick={() => setShowAffecter(false)}>Annuler</button>
-                     <button type="button" className="btn btn-primary elite-btn" onClick={() => {
-                        Promise.all(tachesSelectionnees.map(id => affecterTacheASprint(id, activeSprint.id))).then(() => {
-                          setShowAffecter(false); loadTaches(activeSprint.id); loadAll();
-                        });
-                     }}>Confirmer Affectation</button>
+                     <button type="button" className="btn btn-primary elite-btn" disabled={savingAff || tachesSelectionnees.length === 0} onClick={async () => {
+                          setSavingAff(true);
+                          try {
+                            for (const id of tachesSelectionnees) {
+                              await affecterTacheASprint(id, activeSprint.id);
+                            }
+                            setShowAffecter(false);
+                            loadTaches(activeSprint.id);
+                            loadAll();
+                            ClinisysAlert.success(`${tachesSelectionnees.length} tâches affectées avec succès.`);
+                          } catch (err) {
+                            ClinisysAlert.error("Erreur", "Une ou plusieurs tâches n'ont pas pu être affectées.");
+                          } finally {
+                            setSavingAff(false);
+                          }
+                       }}>
+                         {savingAff ? 'Affectation...' : 'Confirmer Affectation'}
+                       </button>
                   </div>
                </motion.div>
             </div>
@@ -514,11 +591,7 @@ export default function SprintManager() {
         </AnimatePresence>
       </main>
 
-      <ConfirmModal
-        isOpen={confirm.isOpen} title={confirm.title} message={confirm.message}
-        confirmText={confirm.confirmText} type={confirm.type} loading={confirm.loading}
-        onClose={closeConfirm} onConfirm={confirm.onConfirm}
-      />
+      <div style={{ visibility: 'hidden', height: 0 }}></div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .elite-manager-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; }
@@ -571,6 +644,7 @@ export default function SprintManager() {
         .hub-btn.success { background: #10b981; color: #fff; }
         .hub-btn.ghost { background: var(--surface); border: 1.5px solid var(--border); color: var(--text-2); }
         .hub-btn.danger-ghost { background: rgba(239,68,68,0.05); color: #ef4444; }
+        .locked-badge { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-alpha); color: var(--text-3); border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 1px; border: 1.5px solid var(--border); }
 
         .sprint-taches-section { margin-top: 32px; padding-top: 32px; border-top: 1.5px dashed var(--border); }
         .section-title { font-size: 16px; font-weight: 900; margin-bottom: 24px; color: var(--text); }

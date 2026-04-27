@@ -7,6 +7,7 @@ import com.clinisys.enums.StatutStage;
 import com.clinisys.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,18 +22,23 @@ public class StageService {
     private final UtilisateurRepository utilisateurRepository;
     private final SprintRepository sprintRepository;
     private final SujetRepository sujetRepository;
+    private final SujetSessionRepository sujetSessionRepository;
     private final ChoixSujetRepository choixSujetRepository;
     private final MouvementService mouvementService;
     private final NotificationService notificationService;
+    private final DossierStageRepository dossierStageRepository;
 
     // ── Créer un stage ────────────────────────────────────────
     public StageResponse creer(StageRequest req) {
         Stagiaire stagiaire = stagiaireRepository.findById(req.getStagiaireId())
                 .orElseThrow(() -> new RuntimeException("Stagiaire principal non trouvé"));
 
-        // Vérifier si le stagiaire principal a déjà un stage en cours
-        if (hasActiveStage(req.getStagiaireId())) {
-            throw new RuntimeException("Le stagiaire principal a déjà un stage en cours");
+        boolean hasActiveOrPending = stageRepository.findByStagiaireIdOrStagiaire2Id(stagiaire.getId(), stagiaire.getId())
+            .stream()
+            .anyMatch(s -> s.getStatut() == StatutStage.EN_COURS || s.getStatut() == StatutStage.EN_ATTENTE);
+        
+        if (hasActiveOrPending) {
+            throw new RuntimeException("Le stagiaire principal a déjà un stage en cours.");
         }
 
         Encadrant encadrant = encadrantRepository.findById(req.getEncadrantId())
@@ -48,158 +54,119 @@ public class StageService {
         stage.setStagiaire(stagiaire);
         stage.setEncadrant(encadrant);
 
-        // Gestion du binôme
+        if (req.getDossierId() != null) {
+            dossierStageRepository.findById(req.getDossierId()).ifPresent(stage::setDossier);
+        }
+
         if (req.getStagiaire2Id() != null) {
-            if (hasActiveStage(req.getStagiaire2Id())) {
-                throw new RuntimeException("Le second stagiaire a déjà un stage en cours");
-            }
-            Stagiaire stagiaire2 = stagiaireRepository.findById(req.getStagiaire2Id())
-                    .orElseThrow(() -> new RuntimeException("Second stagiaire non trouvé"));
+            Stagiaire stagiaire2 = stagiaireRepository.findById(req.getStagiaire2Id()).orElseThrow();
             stage.setStagiaire2(stagiaire2);
             stage.setEstBinome(true);
-        } else {
-            stage.setEstBinome(false);
+            if (req.getDossier2Id() != null) dossierStageRepository.findById(req.getDossier2Id()).ifPresent(stage::setDossier2);
         }
 
         if (req.getResponsableId() != null) {
-            utilisateurRepository.findById(req.getResponsableId())
-                    .ifPresent(r -> stage.setResponsable((ResponsableStage) r));
+            utilisateurRepository.findById(req.getResponsableId()).ifPresent(r -> stage.setResponsable((ResponsableStage) r));
         }
 
-        // Logic : Automatic subject creation or validation forcing
+        // Logic : Linking to SujetSession
         if (req.getSujetRefId() == null) {
-            // No subject selected -> Create one automatically
-            Sujet s = new Sujet();
-            s.setTitre(req.getSujet());
-            s.setDescription(req.getDescription());
-            s.setType(req.getType());
-            s.setNbMaxStagiaires(req.getStagiaire2Id() != null ? 2 : 1);
-            s.setStatut("VALIDE");
-            if (stage.getResponsable() != null)
-                s.setResponsable(stage.getResponsable());
-            sujetRepository.save(s);
+            // Un-tracked subject -> Create master and session
+            Sujet master = new Sujet();
+            master.setTitre(req.getSujet());
+            master.setDescription(req.getDescription());
+            master.setType(req.getType());
+            master.setResponsable(stage.getResponsable());
+            sujetRepository.save(master);
 
-            // Link stage to created subject
-            stage.setSujet_ref(s);
-
-            // Create choices
-            createAutomaticChoice(s, stagiaire);
-            if (stage.getStagiaire2() != null) {
-                createAutomaticChoice(s, stage.getStagiaire2());
-            }
+            SujetSession session = new SujetSession();
+            session.setSujet(master);
+            session.setAnnee(stage.getDossier() != null ? stage.getDossier().getAnneeStage() : String.valueOf(req.getDateDebut().getYear()));
+            session.setNbMaxStagiaires(stage.getEstBinome() ? 2 : 1);
+            session.setStatut("VALIDE");
+            sujetSessionRepository.save(session);
+            stage.setSujetSession(session);
         } else {
-            // Existing subject -> Force validation and link
-            sujetRepository.findById(req.getSujetRefId()).ifPresent(s -> {
-                s.setStatut("VALIDE");
-                sujetRepository.save(s);
-                stage.setSujet_ref(s);
-                // Ensure stage string fields match subject if they were empty
-                if (stage.getSujet() == null || stage.getSujet().isEmpty()) {
-                    stage.setSujet(s.getTitre());
-                }
-                if (stage.getDescription() == null || stage.getDescription().isEmpty()) {
-                    stage.setDescription(s.getDescription());
-                }
+            // Existing subject occurrence
+            sujetSessionRepository.findById(req.getSujetRefId()).ifPresent(ss -> {
+                ss.setStatut("VALIDE");
+                sujetSessionRepository.save(ss);
+                stage.setSujetSession(ss);
+                if (stage.getSujet() == null || stage.getSujet().isEmpty()) stage.setSujet(ss.getSujet().getTitre());
             });
         }
 
         Stage savedStage = stageRepository.save(stage);
-        mouvementService.enregistrer("Création d'un nouveau stage pour : " + stage.getSujet(), "STAGE_CREE", null);
-        
-        // --- Notification Stagiaire ---
-        String msg = "Un nouveau stage a été créé pour vous sur le sujet : " + stage.getSujet();
-        if (stage.getStagiaire() != null) {
-            notificationService.envoyerNotification(stage.getStagiaire(), "Nouveau Stage", msg, "STAGE_CREE", null);
-        }
-        if (stage.getStagiaire2() != null) {
-            notificationService.envoyerNotification(stage.getStagiaire2(), "Nouveau Stage", msg, "STAGE_CREE", null);
-        }
-
+        mouvementService.enregistrer("Création stage : " + stage.getSujet(), "STAGE_CREE", null);
         return toResponse(savedStage);
     }
 
-    private void createAutomaticChoice(Sujet s, Stagiaire st) {
-        if (!choixSujetRepository.existsBySujetIdAndStagiaireId(s.getId(), st.getId())) {
-            ChoixSujet c = new ChoixSujet();
-            c.setSujet(s);
-            c.setStagiaire(st);
-            c.setDateChoix(LocalDateTime.now());
-            choixSujetRepository.save(c);
-        }
-    }
-
-    private boolean hasActiveStage(Long stagiaireId) {
-        return stageRepository.findByStagiaireIdOrStagiaire2Id(stagiaireId, stagiaireId)
-                .stream()
-                .anyMatch(s -> s.getStatut() == StatutStage.EN_COURS);
-    }
-
-    // ── Lister tous les stages ────────────────────────────────
     public List<StageResponse> getAll() {
-        return stageRepository.findAll()
-                .stream().map(this::toResponse).collect(Collectors.toList());
+        return stageRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ── Stages par encadrant ──────────────────────────────────
     public List<StageResponse> getByEncadrant(Long encadrantId) {
-        return stageRepository.findByEncadrantId(encadrantId)
-                .stream().map(this::toResponse).collect(Collectors.toList());
+        return stageRepository.findByEncadrantId(encadrantId).stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ── Stages par stagiaire ──────────────────────────────────
     public List<StageResponse> getByStagiaire(Long stagiaireId) {
-        return stageRepository.findByStagiaireIdOrStagiaire2Id(stagiaireId, stagiaireId)
-                .stream().map(this::toResponse).collect(Collectors.toList());
+        return stageRepository.findByStagiaireIdOrStagiaire2Id(stagiaireId, stagiaireId).stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ── Trouver par ID ────────────────────────────────────────
     public StageResponse getById(Long id) {
-        return toResponse(stageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Stage non trouvé")));
+        return toResponse(stageRepository.findById(id).orElseThrow());
     }
 
-    // ── Changer le statut ─────────────────────────────────────
+    @Transactional
     public StageResponse changerStatut(Long id, StatutStage nouveauStatut) {
-        Stage stage = stageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Stage non trouvé"));
-        stage.setStatut(nouveauStatut);
-        Stage saved = stageRepository.save(stage);
-        mouvementService.enregistrer("Le statut du stage '" + stage.getSujet() + "' a été changé en : " + nouveauStatut, "STAGE_STATUT_CHANGE", null);
-        
-        // --- Notification Stagiaire si Validé ---
+        Stage stage = stageRepository.findById(id).orElseThrow();
+
+        // RÈGLE : Validation finale possible seulement si le dernier sprint est clôturé
         if (nouveauStatut == StatutStage.VALIDE) {
-            String msg = "Félicitations ! Votre stage sur le sujet '" + stage.getSujet() + "' a été officiellement validé.";
-            if (stage.getStagiaire() != null) {
-                notificationService.envoyerNotification(stage.getStagiaire(), "Stage Validé", msg, "STAGE_VALIDE", null);
+            List<Sprint> sprints = sprintRepository.findByStageIdOrderByNumero(id);
+            if (sprints.isEmpty()) {
+                throw new RuntimeException("Impossible de valider le stage : aucun sprint n'a été créé.");
             }
-            if (stage.getStagiaire2() != null) {
-                notificationService.envoyerNotification(stage.getStagiaire2(), "Stage Validé", msg, "STAGE_VALIDE", null);
+            
+            Sprint dernierSprint = sprints.get(sprints.size() - 1);
+            boolean estCloture = dernierSprint.getStatut() == com.clinisys.enums.StatutSprint.TERMINE 
+                              || dernierSprint.getStatut() == com.clinisys.enums.StatutSprint.TERMINE_INCOMPLET;
+            
+            if (!estCloture) {
+                throw new RuntimeException("Validation impossible : le dernier sprint (" + dernierSprint.getNom() + ") doit être clôturé d'abord.");
+            }
+        }
+
+        stage.setStatut(nouveauStatut);
+        
+        if (nouveauStatut == StatutStage.VALIDE) {
+            if (stage.getSujetSession() != null) {
+                SujetSession ss = stage.getSujetSession();
+                ss.setStatut("DISPONIBLE"); // Prêt pour une autre session
+                sujetSessionRepository.save(ss);
+
+                // ✅ Libération automatique : supprimer les choix (réservations) liés à ce sujet pour cette session
+                List<ChoixSujet> choixLies = choixSujetRepository.findBySujetSessionId(ss.getId());
+                if (!choixLies.isEmpty()) {
+                    choixSujetRepository.deleteAll(choixLies);
+                }
             }
         }
         
-        return toResponse(saved);
+        return toResponse(stageRepository.save(stage));
     }
 
-    // ── Affecter un encadrant ─────────────────────────────────
     public StageResponse affecterEncadrant(Long stageId, Long encadrantId) {
-        Stage stage = stageRepository.findById(stageId)
-                .orElseThrow(() -> new RuntimeException("Stage non trouvé"));
-        Encadrant encadrant = encadrantRepository.findById(encadrantId)
-                .orElseThrow(() -> new RuntimeException("Encadrant non trouvé"));
+        Stage stage = stageRepository.findById(stageId).orElseThrow();
+        Encadrant encadrant = encadrantRepository.findById(encadrantId).orElseThrow();
         stage.setEncadrant(encadrant);
-        Stage saved = stageRepository.save(stage);
-        mouvementService.enregistrer("L'encadrant " + encadrant.getPrenom() + " " + encadrant.getNom() + " a été affecté au stage : " + stage.getSujet(), "STAGE_ENCADRANT_AFFECTE", null);
-        return toResponse(saved);
+        return toResponse(stageRepository.save(stage));
     }
 
-    // ── Supprimer ─────────────────────────────────────────────
     public void delete(Long id) {
-        if (!stageRepository.existsById(id))
-            throw new RuntimeException("Stage non trouvé");
         stageRepository.deleteById(id);
     }
 
-    // ── Mapper entité → DTO ───────────────────────────────────
     private StageResponse toResponse(Stage s) {
         StageResponse r = new StageResponse();
         r.setId(s.getId());
@@ -209,6 +176,7 @@ public class StageService {
         r.setDateFin(s.getDateFin());
         r.setType(s.getType());
         r.setStatut(s.getStatut());
+        r.setEstBinome(s.getEstBinome());
 
         if (s.getStagiaire() != null) {
             r.setStagiaireId(s.getStagiaire().getId());
@@ -216,25 +184,37 @@ public class StageService {
             r.setStagiairePrenom(s.getStagiaire().getPrenom());
             r.setStagiaireEmail(s.getStagiaire().getEmail());
         }
-        if (s.getEncadrant() != null) {
-            r.setEncadrantId(s.getEncadrant().getId());
-            r.setEncadrantNom(s.getEncadrant().getNom());
-            r.setEncadrantPrenom(s.getEncadrant().getPrenom());
-            r.setEncadrantEmail(s.getEncadrant().getEmail());
-        }
-        // Ce bloc doit être présent dans toResponse()
         if (s.getStagiaire2() != null) {
             r.setStagiaire2Id(s.getStagiaire2().getId());
             r.setStagiaire2Nom(s.getStagiaire2().getNom());
             r.setStagiaire2Prenom(s.getStagiaire2().getPrenom());
         }
-        r.setEstBinome(s.getEstBinome());
+        if (s.getEncadrant() != null) {
+            r.setEncadrantId(s.getEncadrant().getId());
+            r.setEncadrantNom(s.getEncadrant().getNom());
+            r.setEncadrantPrenom(s.getEncadrant().getPrenom());
+        }
 
         List<Sprint> sprints = sprintRepository.findByStageIdOrderByNumero(s.getId());
         r.setNbSprints(sprints.size());
         r.setTauxAvancement(sprints.stream()
                 .mapToDouble(sp -> sp.getTauxAvancement() != null ? sp.getTauxAvancement() : 0)
                 .average().orElse(0));
+
+        if (s.getDossier() != null) {
+            r.setDossierId(s.getDossier().getId());
+            r.setAnnee(s.getDossier().getAnneeStage());
+        } else if (s.getSujetSession() != null) {
+            r.setAnnee(s.getSujetSession().getAnnee());
+        }
+
+        if (s.getDossier2() != null) {
+            r.setDossier2Id(s.getDossier2().getId());
+        }
+        
+        if (r.getAnnee() == null && s.getDateDebut() != null) {
+            r.setAnnee(String.valueOf(s.getDateDebut().getYear()));
+        }
 
         return r;
     }

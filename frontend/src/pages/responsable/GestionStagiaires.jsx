@@ -16,23 +16,20 @@ import {
 import { getByRole } from "../../api/utilisateurAPI";
 import Topbar from "../../components/common/Topbar";
 import { useTheme } from "../../context/ThemeContext";
-import ConfirmModal from "../../components/common/ConfirmModal";
+import ClinisysAlert from "../../utils/SwalUtils";
 import {
-  Plus, UserPlus, FolderPlus, Users, GraduationCap,
-  Calendar, Search, Filter, Clock, CheckCircle,
-  AlertCircle, Trash2, Edit, Mail, Smartphone,
-  CreditCard, School as University, Book, ChevronRight, RefreshCw,
-  MoreVertical, ArrowUpRight, HelpCircle
+  LayoutDashboard, ClipboardList, BarChart, GraduationCap, FileText, UserPlus, FolderPlus, CheckCircle, Calendar, Users, Search, RefreshCw, University, Book, ChevronRight, Trash2, Mail, Smartphone, CreditCard, ArrowUpRight, Plus, AlertCircle, Clock, Edit, Download, Briefcase, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../../api/axiosConfig";
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/responsable/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/responsable/stages", icon: "📋", label: "Stages" },
-  { path: "/responsable/sujets", icon: "📝", label: "Sujets" },
-  { path: "/responsable/stagiaires", icon: "🎓", label: "Stagiaires" },
-  { path: "/responsable/analytique", icon: "📊", label: "Analytique" },
+  { path: "/responsable/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/responsable/stages", icon: <ClipboardList size={18} />, label: "Stages" },
+  { path: "/responsable/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/responsable/stagiaires", icon: <GraduationCap size={18} />, label: "Stagiaires" },
+  { path: "/responsable/analytique", icon: <BarChart size={18} />, label: "Analytique" },
 ];
 
 const NIVEAU_BG = {
@@ -50,18 +47,23 @@ const EMPTY_DOS = {
   universite: "",
   specialite: "",
   niveauEtude: "",
+  niveauEtude: "",
   anneeStage: "",
 };
 
 export default function GestionStagiaires() {
   const { user } = useAuth();
+  const { activeSession } = useSession();
 
   const [onglet, setOnglet] = useState("dossiers");
+  const formatYear = (y) => y && y.includes("-") ? y.split("-")[1] : y;
   const [dossiers, setDossiers] = useState([]);
   const [annees, setAnnees] = useState([]);
-  const [anneeFilter, setAnneeFilter] = useState("TOUTES");
+  const [anneeFilter, setAnneeFilter] = useState(activeSession);
   const [searchDos, setSearchDos] = useState("");
   const [selectedDos, setSelectedDos] = useState(null);
+  const [cvFile, setCvFile] = useState(null);
+  const [portFile, setPortFile] = useState(null);
   const [identites, setIdentites] = useState([]);
   const [searchId, setSearchId] = useState("");
   const [comptesStagiaires, setComptesStagiaires] = useState([]);
@@ -76,27 +78,18 @@ export default function GestionStagiaires() {
   const [saving, setSaving] = useState(false);
   const { sidebarMini } = useTheme();
 
-  const [confirm, setConfirm] = useState({
-    isOpen: false,
-    title: "",
-    message: "",
-    confirmText: "Confirmer",
-    type: "primary",
-    onConfirm: () => { },
-  });
 
-  const closeConfirm = () => setConfirm((p) => ({ ...p, isOpen: false }));
 
   useEffect(() => {
     if (user?.id) loadAll();
-  }, [user]);
+  }, [user, activeSession]);
 
   const loadAll = async () => {
     setLoading(true);
     try {
       const [idRes, dosRes, annRes, compRes] = await Promise.all([
         getIdentitesByResponsable(user.id),
-        getDossiersByResponsable(user.id),
+        getDossiersByResponsable(user.id, activeSession),
         getAnneesByResponsable(user.id),
         getByRole("ROLE_STAGIAIRE"),
       ]);
@@ -157,6 +150,7 @@ export default function GestionStagiaires() {
       setShowModalId(false);
       setFormId(EMPTY_ID);
       loadAll();
+      ClinisysAlert.success(editModeId ? "Mise à jour réussie" : "Stagiaire enregistré");
     } catch (err) {
       let msg = "Erreur sauvegarde";
       if (err.response?.data?.message) {
@@ -165,7 +159,7 @@ export default function GestionStagiaires() {
         // Cas des erreurs de validation Spring (@Valid)
         msg = Object.values(err.response.data.errors).join(", ");
       }
-      setError(msg);
+      ClinisysAlert.error("Erreur", msg);
     } finally {
       setSaving(false);
     }
@@ -191,57 +185,70 @@ export default function GestionStagiaires() {
     setSaving(true);
     setError("");
     try {
-      await creerDossier({
-        ...formDos,
-        stagiaireId: Number(formDos.stagiaireId),
-        responsableId: user.id,
-      });
+      const formData = new FormData();
+      formData.append("stagiaireId", Number(formDos.stagiaireId));
+      formData.append("responsableId", user.id);
+      formData.append("universite", formDos.universite);
+      formData.append("specialite", formDos.specialite);
+      formData.append("niveauEtude", formDos.niveauEtude);
+      formData.append("anneeStage", activeSession);
+      
+      if (cvFile) formData.append("cv", cvFile);
+      if (portFile) formData.append("portfolio", portFile);
+
+      await creerDossier(formData);
       setShowModalDos(false);
       setFormDos(EMPTY_DOS);
-      reloadDossiers(anneeFilter);
+      setCvFile(null);
+      setPortFile(null);
+      reloadDossiers(activeSession);
+      ClinisysAlert.success("Dossier créé avec succès");
     } catch (err) {
-      setError(err.response?.data?.message || "Erreur création dossier");
+      ClinisysAlert.error("Erreur", err.response?.data?.message || "Erreur création dossier");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteIdentite = (id) => {
-    setConfirm({
-      isOpen: true,
+  const handleDeleteIdentite = (identite) => {
+    if (identite.compteCreer) {
+      ClinisysAlert.error("Action Interdite", "Impossible de supprimer une identité dont le compte est déjà créé.");
+      return;
+    }
+
+    ClinisysAlert.confirm({
       title: "Supprimer l'identité",
-      message: "Voulez-vous vraiment supprimer cette identité de stagiaire ?",
+      text: `Voulez-vous vraiment supprimer l'identité de ${identite.prenom} ${identite.nom} ?`,
       confirmText: "Supprimer",
-      type: "danger",
-      onConfirm: async () => {
+      danger: true
+    }).then(async (result) => {
+      if (result.isConfirmed) {
         try {
-          await deleteIdentite(id);
+          await deleteIdentite(identite.id);
           loadAll();
-          closeConfirm();
+          ClinisysAlert.success("Identité supprimée");
         } catch {
-          alert("Erreur suppression");
-          closeConfirm();
+          ClinisysAlert.error("Erreur", "Impossible de supprimer l'identité");
         }
       }
     });
   };
 
   const handleDeleteDossier = (id) => {
-    setConfirm({
-      isOpen: true,
+    ClinisysAlert.confirm({
       title: "Supprimer le dossier",
-      message: "Voulez-vous vraiment supprimer ce dossier de stage ? Cette action est définitive.",
+      text: "Voulez-vous vraiment supprimer ce dossier de stage ? Cette action est définitive.",
       confirmText: "Supprimer",
-      type: "danger",
-      onConfirm: async () => {
+      danger: true
+    }).then(async (result) => {
+      if (result.isConfirmed) {
         try {
           await deleteDossier(id);
           setSelectedDos(null);
-          reloadDossiers(anneeFilter);
-          closeConfirm();
+          reloadDossiers(activeSession);
+          ClinisysAlert.success("Dossier supprimé");
         } catch {
-          alert("Erreur suppression");
-          closeConfirm();
+          ClinisysAlert.error("Erreur", "Impossible de supprimer le dossier");
         }
       }
     });
@@ -285,7 +292,7 @@ export default function GestionStagiaires() {
               onClick={() => {
                 setShowModalDos(true);
                 setError("");
-                setFormDos(EMPTY_DOS);
+                setFormDos({ ...EMPTY_DOS, anneeStage: activeSession });
               }}
               disabled={comptesStagiaires.length === 0}
             >
@@ -431,7 +438,7 @@ export default function GestionStagiaires() {
                         transition: 'all 0.2s'
                       }}
                     >
-                      {a === "TOUTES" ? "Toutes les années" : a}
+                      {a === "TOUTES" ? "Toutes les années" : formatYear(a)}
                     </button>
                   ))}
                 </div>
@@ -449,7 +456,7 @@ export default function GestionStagiaires() {
               </div>
             ) : dossiersFiltres.length === 0 ? (
               <div className="premium-card" style={{ textAlign: "center", padding: 80 }}>
-                <div style={{ fontSize: 60, marginBottom: 20 }}>📁</div>
+                <div style={{ marginBottom: 20, color: 'var(--text-3)' }}><FolderPlus size={60} /></div>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 10 }}>Aucun dossier trouvé</h3>
                 <p style={{ color: "var(--text-3)", fontSize: 15 }}>
                   {dossiers.length === 0
@@ -489,7 +496,7 @@ export default function GestionStagiaires() {
                               {d.stagiairePrenom} {d.stagiaireNom}
                             </span>
                             <span style={{ background: "var(--primary-lt)", color: "var(--primary)", padding: "4px 12px", borderRadius: 12, fontSize: 11, fontWeight: 800 }}>
-                              {d.anneeStage}
+                              {formatYear(d.anneeStage)}
                             </span>
                           </div>
                           <div style={{ fontSize: 13, color: "var(--text-3)", display: "flex", gap: 16, alignItems: 'center' }}>
@@ -524,7 +531,7 @@ export default function GestionStagiaires() {
                               {selectedDos.stagiairePrenom} {selectedDos.stagiaireNom}
                             </h3>
                             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                              <span style={{ background: "var(--primary)", color: "#fff", padding: "4px 12px", borderRadius: 10, fontSize: 11, fontWeight: 700 }}>DOSSIER {selectedDos.anneeStage}</span>
+                              <span style={{ background: "var(--primary)", color: "#fff", padding: "4px 12px", borderRadius: 10, fontSize: 11, fontWeight: 700 }}>DOSSIER {formatYear(selectedDos.anneeStage)}</span>
                               <span style={{ background: NIVEAU_BG[selectedDos.niveauEtude] || "#f3f4f6", color: "var(--primary)", padding: "4px 12px", borderRadius: 10, fontSize: 11, fontWeight: 700 }}>{selectedDos.niveauEtude}</span>
                             </div>
                           </div>
@@ -549,7 +556,7 @@ export default function GestionStagiaires() {
                               { label: "Université", value: selectedDos.universite, icon: <University size={16} /> },
                               { label: "Spécialité", value: selectedDos.specialite, icon: <Book size={16} /> },
                               { label: "Niveau", value: selectedDos.niveauEtude, icon: <GraduationCap size={16} /> },
-                              { label: "Année Stage", value: selectedDos.anneeStage, icon: <Calendar size={16} /> },
+                              { label: "Année Stage", value: formatYear(selectedDos.anneeStage), icon: <Calendar size={16} /> },
                             ].map((item, i) => (
                               <div key={i}>
                                 <div style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -579,6 +586,48 @@ export default function GestionStagiaires() {
                                 </div>
                               </div>
                             ))}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--bg)', borderRadius: 20, padding: 24 }}>
+                          <h4 style={{ fontSize: 12, color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: 20, letterSpacing: '1px', fontWeight: 700 }}>Documents Joints</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>
+                            {selectedDos.cvPath ? (
+                              <a 
+                                href={`${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/folders-stage/files/${selectedDos.cvPath}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="btn"
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', border: '1px solid var(--border)', fontSize: 13, padding: '12px 16px', borderRadius: 12, color: 'var(--text)' }}
+                              >
+                                <FileText size={18} style={{ color: 'var(--primary)' }} />
+                                <div>
+                                  <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 700 }}>CURRICULUM VITAE</div>
+                                  <div style={{ fontWeight: 600 }}>Télécharger</div>
+                                </div>
+                                <Download size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+                              </a>
+                            ) : (
+                              <div style={{ padding: '12px 16px', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text-3)', fontSize: 12, textAlign: 'center' }}>Aucun CV déposé</div>
+                            )}
+
+                            {selectedDos.portfolioPath ? (
+                              <a 
+                                href={`${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/folders-stage/files/${selectedDos.portfolioPath}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="btn"
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', border: '1px solid var(--border)', fontSize: 13, padding: '12px 16px', borderRadius: 12, color: 'var(--text)' }}
+                              >
+                                <Briefcase size={18} style={{ color: 'var(--accent)' }} />
+                                <div>
+                                  <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 700 }}>PORTFOLIO</div>
+                                  <div style={{ fontWeight: 600 }}>Télécharger</div>
+                                </div>
+                                <Download size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+                              </a>
+                            ) : (
+                              <div style={{ padding: '12px 16px', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text-3)', fontSize: 12, textAlign: 'center' }}>Aucun Portfolio</div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -621,7 +670,7 @@ export default function GestionStagiaires() {
                 className="premium-card"
                 style={{ textAlign: "center", padding: 80 }}
               >
-                <div style={{ fontSize: 60, marginBottom: 24 }}>👤</div>
+                <div style={{ marginBottom: 24, color: 'var(--text-3)' }}><Users size={60} /></div>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 10 }}>Aucun stagiaire enregistré</h3>
                 <p style={{ color: "var(--text-3)", fontSize: 15 }}>
                   Commencez par ajouter l'identité des stagiaires pour pouvoir créer leurs dossiers.
@@ -673,13 +722,15 @@ export default function GestionStagiaires() {
                                 <Edit size={14} />
                               </button>
                             )}
-                            <button
-                              className="btn btn-outline"
-                              style={{ width: 32, height: 32, padding: 0, borderRadius: 8, color: 'var(--danger)' }}
-                              onClick={() => handleDeleteIdentite(i.id)}
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {!i.compteCreer && (
+                              <button
+                                className="btn btn-outline"
+                                style={{ width: 32, height: 32, padding: 0, borderRadius: 8, color: 'var(--danger)' }}
+                                onClick={() => handleDeleteIdentite(i)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -735,11 +786,11 @@ export default function GestionStagiaires() {
                     <div className="grid-2" style={{ gap: 24 }}>
                       <div className="form-group-v2">
                         <label>Prénom</label>
-                        <input value={formId.prenom} onChange={fi("prenom")} required placeholder="Ex: Ahmed" />
+                        <input value={formId.prenom} onChange={fi("prenom")} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} required placeholder="Ex: Ahmed" />
                       </div>
                       <div className="form-group-v2">
                         <label>Nom</label>
-                        <input value={formId.nom} onChange={fi("nom")} required placeholder="Ex: Ouali" />
+                        <input value={formId.nom} onChange={fi("nom")} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} required placeholder="Ex: Ouali" />
                       </div>
                     </div>
                     <div className="form-group-v2">
@@ -749,11 +800,11 @@ export default function GestionStagiaires() {
                     <div className="grid-2" style={{ gap: 24 }}>
                       <div className="form-group-v2">
                         <label>Téléphone</label>
-                        <input value={formId.telephone} onChange={fi("telephone")} required placeholder="8 chiffres" pattern="\d{8}" title="8 chiffres requis" maxLength={8} />
+                        <input value={formId.telephone} onChange={fi("telephone")} onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }} required placeholder="8 chiffres" pattern="\d{8}" title="8 chiffres requis" maxLength={8} />
                       </div>
                       <div className="form-group-v2">
                         <label>CIN (Carte d'identité)</label>
-                        <input value={formId.cin} onChange={fi("cin")} required placeholder="8 chiffres" pattern="\d{8}" title="8 chiffres requis" maxLength={8} />
+                        <input value={formId.cin} onChange={fi("cin")} onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }} required placeholder="8 chiffres" pattern="\d{8}" title="8 chiffres requis" maxLength={8} />
                       </div>
                     </div>
                   </div>
@@ -775,29 +826,54 @@ export default function GestionStagiaires() {
           {showModalDos && (
             <div className="modal-overlay">
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                initial={{ opacity: 0, scale: 0.88, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                exit={{ opacity: 0, scale: 0.88, y: 16 }}
+                transition={{ type: 'spring', damping: 22, stiffness: 280 }}
                 className="premium-card modal-content-v2"
-                style={{ width: 580, padding: 0 }}
+                style={{ 
+                  width: 580, 
+                  padding: 0, 
+                  overflow: 'hidden',
+                  borderRadius: 24,
+                  boxShadow: '0 20px 50px -10px var(--primary-lt), 0 0 0 1px var(--border)'
+                }}
               >
-                <div style={{ padding: 40, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 style={{ fontSize: 24, fontWeight: 900 }}>Dossier de stage</h2>
-                  <button onClick={() => setShowModalDos(false)} className="icon-btn-v2"><Plus style={{ transform: 'rotate(45deg)' }} /></button>
+                {/* Header — Premium Blue Gradient */}
+                <div style={{ 
+                  background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)', 
+                  padding: '32px 40px',
+                  position: 'relative'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Briefcase size={22} color="#fff" />
+                    </div>
+                    <button 
+                      onClick={() => setShowModalDos(false)} 
+                      style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' }}
+                    >
+                      <Plus style={{ transform: 'rotate(45deg)' }} size={20} />
+                    </button>
+                  </div>
+                  <h2 style={{ color: '#fff', fontSize: 24, fontWeight: 900, margin: 0 }}>Générer un dossier</h2>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Création automatique pour la session <strong style={{ color: '#fff' }}>{activeSession}</strong></p>
                 </div>
 
-                <div style={{ padding: "20px 40px", background: 'var(--primary-light-alpha)', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--primary)', fontWeight: 600, display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <HelpCircle size={18} />
-                  Chaque stagiaire peut avoir plusieurs dossiers selon les sessions annuelles.
+                <div style={{ padding: "16px 40px", background: 'var(--primary-lt)', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--primary)', fontWeight: 600, display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <HelpCircle size={16} />
+                  Le dossier sera instantanément archivé dans la session annuelle en cours.
                 </div>
 
-                <form onSubmit={handleCreateDossier} style={{ padding: 40 }}>
+                <form onSubmit={handleCreateDossier} style={{ padding: '32px 40px 40px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                     <div className="form-group-v2">
                       <label>Stagiaire</label>
-                      <select value={formDos.stagiaireId} onChange={fd("stagiaireId")} required>
+                      <select value={formDos.stagiaireId} onChange={fd("stagiaireId")} required style={{ background: 'var(--bg)', borderRadius: 14 }}>
                         <option value="">Sélectionner un compte stagiaire</option>
-                        {comptesStagiaires.map((s) => (
+                        {comptesStagiaires
+                          .filter(s => identites.some(id => id.email === s.email && id.compteCreer))
+                          .map((s) => (
                           <option key={s.id} value={s.id}>{s.prenom} {s.nom} ({s.email})</option>
                         ))}
                       </select>
@@ -805,33 +881,50 @@ export default function GestionStagiaires() {
 
                     <div className="grid-2" style={{ gap: 24 }}>
                       <div className="form-group-v2">
-                        <label>Session (Année)</label>
-                        <input value={formDos.anneeStage} onChange={fd("anneeStage")} required placeholder="Ex: 2024-2025" />
-                      </div>
-                      <div className="form-group-v2">
                         <label>Niveau d'étude</label>
-                        <select value={formDos.niveauEtude} onChange={fd("niveauEtude")}>
+                        <select value={formDos.niveauEtude} onChange={fd("niveauEtude")} style={{ background: 'var(--bg)', borderRadius: 14 }}>
                           <option value="">Choisir...</option>
                           {["Licence 1", "Licence 2", "Licence 3", "Master 1", "Master 2", "Ingénieur"].map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
                       </div>
+                      <div className="form-group-v2">
+                        <label>Université / École</label>
+                        <input value={formDos.universite} onChange={fd("universite")} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} placeholder="Ex: ESPRIT" style={{ background: 'var(--bg)', borderRadius: 14 }} />
+                      </div>
+                    </div>
+
+                    <div className="form-group-v2">
+                      <label>Spécialité / Branche</label>
+                      <input value={formDos.specialite} onChange={fd("specialite")} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} placeholder="Ex: Génie Logiciel" style={{ background: 'var(--bg)', borderRadius: 14 }} />
                     </div>
 
                     <div className="grid-2" style={{ gap: 24 }}>
                       <div className="form-group-v2">
-                        <label>Université / École</label>
-                        <input value={formDos.universite} onChange={fd("universite")} placeholder="Ex: ESPRIT" />
+                        <label>Curriculum Vitae (CV)</label>
+                        <div className="file-upload-wrapper" style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '24px 20px', textAlign: 'center', cursor: 'pointer', position: 'relative', background: cvFile ? 'var(--primary-lt)' : 'var(--bg)', transition: '0.2s' }}>
+                          <input type="file" onChange={(e) => setCvFile(e.target.files[0])} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} accept=".pdf,.doc,.docx" />
+                          <div style={{ color: cvFile ? 'var(--primary)' : 'var(--text-3)', fontSize: 13, fontWeight: 600 }}>
+                            <FileText size={28} style={{ marginBottom: 10, opacity: 0.8 }} /><br/>
+                            {cvFile ? cvFile.name : "Glissez votre CV (PDF, DOC)"}
+                          </div>
+                        </div>
                       </div>
                       <div className="form-group-v2">
-                        <label>Spécialité / Branche</label>
-                        <input value={formDos.specialite} onChange={fd("specialite")} placeholder="Ex: Génie Logiciel" />
+                        <label>Portfolio / Documents</label>
+                        <div className="file-upload-wrapper" style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '24px 20px', textAlign: 'center', cursor: 'pointer', position: 'relative', background: portFile ? 'var(--primary-lt)' : 'var(--bg)', transition: '0.2s' }}>
+                          <input type="file" onChange={(e) => setPortFile(e.target.files[0])} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} accept=".pdf,.zip,.rar" />
+                          <div style={{ color: portFile ? 'var(--primary)' : 'var(--text-3)', fontSize: 13, fontWeight: 600 }}>
+                            <Briefcase size={28} style={{ marginBottom: 10, opacity: 0.8 }} /><br/>
+                            {portFile ? portFile.name : "Documents (PDF, ZIP)"}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 40, display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
-                    <button type="button" className="btn btn-outline" onClick={() => setShowModalDos(false)}>Annuler</button>
-                    <button type="submit" className="btn btn-primary" disabled={saving}>
+                  <div style={{ marginTop: 40, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn btn-outline" onClick={() => setShowModalDos(false)} style={{ padding: '12px 24px', borderRadius: 12 }}>Annuler</button>
+                    <button type="submit" className="btn btn-primary" disabled={saving} style={{ padding: '12px 32px', borderRadius: 12, background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)', boxShadow: '0 8px 20px -6px var(--primary-lt)' }}>
                       {saving ? <RefreshCw className="spin" size={18} /> : "Générer le dossier"}
                     </button>
                   </div>
@@ -841,15 +934,6 @@ export default function GestionStagiaires() {
           )}
         </AnimatePresence>
 
-        <ConfirmModal
-          isOpen={confirm.isOpen}
-          title={confirm.title}
-          message={confirm.message}
-          confirmText={confirm.confirmText}
-          type={confirm.type}
-          onClose={closeConfirm}
-          onConfirm={confirm.onConfirm}
-        />
       </main>
 
       <style dangerouslySetInnerHTML={{

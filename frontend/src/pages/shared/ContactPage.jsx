@@ -1,8 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  ArrowLeft, Mail, Phone, MapPin, 
+import {
+  ArrowLeft, Mail, Phone, MapPin,
   ShieldCheck, CheckCircle2, Headphones,
   Send, Globe, MessageSquare, Zap
 } from "lucide-react";
@@ -30,49 +30,49 @@ const ContactPage = () => {
             </div>
 
             <div className="support-hero">
-               <div className="support-badge"><Zap size={14} /> ELITE SERVICE DESK</div>
-               <h3>Besoin d'expertise ?</h3>
-               <p>Notre équipe d'ingénierie et d'administration est mobilisée pour assurer la continuité de votre expérience.</p>
+              <div className="support-badge"><Zap size={14} /> ELITE SERVICE DESK</div>
+              <h3>Besoin d'expertise ?</h3>
+              <p>Notre équipe d'ingénierie et d'administration est mobilisée pour assurer la continuité de votre expérience.</p>
             </div>
 
             <div className="elite-channel-grid">
-               <motion.div whileHover={{ y: -5 }} className="channel-tile">
-                  <div className="c-icon mail"><Mail size={22} /></div>
-                  <div className="c-info">
-                     <label>LIGNES DIRECTES EMAIL</label>
-                     <p>ahmedouali301@gmail.com</p>
-                     <p>marouenweli8@gmail.com</p>
-                  </div>
-               </motion.div>
+              <motion.div whileHover={{ y: -5 }} className="channel-tile">
+                <div className="c-icon mail"><Mail size={22} /></div>
+                <div className="c-info">
+                  <label>LIGNES DIRECTES EMAIL</label>
+                  <p>ahmedouali301@gmail.com</p>
+                  <p>marouenweli8@gmail.com</p>
+                </div>
+              </motion.div>
 
-               <motion.div whileHover={{ y: -5 }} className="channel-tile">
-                  <div className="c-icon phone"><Phone size={22} /></div>
-                  <div className="c-info">
-                     <label>SUPPORT OPÉRATIONNEL</label>
-                     <p>+216 74 123 456</p>
-                     <span>Standard Clinisys Digital</span>
-                  </div>
-               </motion.div>
+              <motion.div whileHover={{ y: -5 }} className="channel-tile">
+                <div className="c-icon phone"><Phone size={22} /></div>
+                <div className="c-info">
+                  <label>SUPPORT OPÉRATIONNEL</label>
+                  <p>+216 74 123 456</p>
+                  <span>Standard Clinisys Digital</span>
+                </div>
+              </motion.div>
 
-               <motion.div whileHover={{ y: -5 }} className="channel-tile">
-                  <div className="c-icon map"><MapPin size={22} /></div>
-                  <div className="c-info">
-                     <label>SIÈGE SOCIAL</label>
-                     <p>Technopark El Ghazala, Sfax</p>
-                     <span>Tunisie, Zone Industrielle</span>
-                  </div>
-               </motion.div>
+              <motion.div whileHover={{ y: -5 }} className="channel-tile">
+                <div className="c-icon map"><MapPin size={22} /></div>
+                <div className="c-info">
+                  <label>SIÈGE SOCIAL</label>
+                  <p>Technopark El Ghazala, Sfax</p>
+                  <span>Tunisie, Zone Industrielle</span>
+                </div>
+              </motion.div>
             </div>
 
             <div className="availability-guarantee">
-               <div className="g-left">
-                  <CheckCircle2 size={20} />
-                  <div className="g-text">
-                     <strong>Support 24/7 Actif</strong>
-                     <p>Intervention prioritaire garantie pour les incidents critiques.</p>
-                  </div>
-               </div>
-               <div className="live-status-pulse"></div>
+              <div className="g-left">
+                <CheckCircle2 size={20} />
+                <div className="g-text">
+                  <strong>Support 24/7 Actif</strong>
+                  <p>Intervention prioritaire garantie pour les incidents critiques.</p>
+                </div>
+              </div>
+              <div className="live-status-pulse"></div>
             </div>
 
             <div className="support-footer-action">
@@ -85,7 +85,8 @@ const ContactPage = () => {
         </motion.div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .elite-support-card { max-width: 600px !important; padding: 48px !important; }
         .login-brand-text.elite { transform: translateY(4px); }
         

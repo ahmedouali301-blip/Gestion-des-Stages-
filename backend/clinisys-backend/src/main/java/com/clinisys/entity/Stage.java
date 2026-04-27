@@ -45,6 +45,14 @@ public class Stage {
     private Stagiaire stagiaire2;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dossier_id")
+    private DossierStage dossier;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dossier2_id")
+    private DossierStage dossier2;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "encadrant_id")
     private Encadrant encadrant;
 
@@ -54,12 +62,20 @@ public class Stage {
 
     // Lien vers le sujet source (pour traçabilité)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sujet_id")
-    private Sujet sujet_ref;
+    @JoinColumn(name = "sujet_session_id")
+    private SujetSession sujetSession;
 
     // Indique si ce stage est un binôme
     private Boolean estBinome = false;
 
     @OneToMany(mappedBy = "stage", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Sprint> sprints;
+
+    private java.time.LocalDateTime dateCreation;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.dateCreation == null)
+            this.dateCreation = java.time.LocalDateTime.now();
+    }
 }

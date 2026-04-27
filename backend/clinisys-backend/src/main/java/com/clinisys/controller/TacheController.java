@@ -41,7 +41,7 @@ public class TacheController {
 
     // ── Supprimer une tâche simple ────────────────────────────
     @DeleteMapping("/simple/{tacheId}")
-    @PreAuthorize("hasRole('ENCADRANT')")
+    @PreAuthorize("hasAnyRole('ENCADRANT', 'STAGIAIRE')")
     public ResponseEntity<String> deleteTacheSimple(@PathVariable Long tacheId) {
         tacheService.deleteTacheSimple(tacheId);
         return ResponseEntity.ok("Tâche supprimée");
@@ -58,7 +58,7 @@ public class TacheController {
 
     // ── Retirer une tâche d'un sprint ─────────────────────────
     @DeleteMapping("/sprint-affectation/{tacheSprintId}")
-    @PreAuthorize("hasRole('ENCADRANT')")
+    @PreAuthorize("hasAnyRole('ENCADRANT', 'STAGIAIRE')")
     public ResponseEntity<String> retirer(@PathVariable Long tacheSprintId) {
         tacheService.retirerTacheDuSprint(tacheSprintId);
         return ResponseEntity.ok("Tâche retirée du sprint");
@@ -110,7 +110,7 @@ public class TacheController {
 
     // ── Supprimer tâche d'un sprint ───────────────────────────
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ENCADRANT')")
+    @PreAuthorize("hasAnyRole('ENCADRANT', 'STAGIAIRE')")
     public ResponseEntity<String> delete(@PathVariable Long id) {
         tacheService.delete(id);
         return ResponseEntity.ok("Tâche supprimée du sprint");

@@ -1,7 +1,7 @@
 import api from './axiosConfig';
  
-export const getStatsGlobales     = ()   => api.get('/dashboard/stats');
-export const getDashboardComplet  = ()   => api.get('/dashboard/complet');
+export const getStatsGlobales     = (annee) => api.get('/dashboard/stats', { params: { annee } });
+export const getDashboardComplet  = (annee) => api.get('/dashboard/complet', { params: { annee } });
 export const getStatsByEncadrant  = (id) => api.get(`/dashboard/stats/encadrant/${id}`);
  
 // Export PDF — retourne un blob

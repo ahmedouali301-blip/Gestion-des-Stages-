@@ -19,28 +19,28 @@ public class DashboardController {
 
     // GET /api/dashboard/stats
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyRole('ADMINISTRATEUR','RESPONSABLE_STAGE')")
-    public ResponseEntity<DashboardStats> getStatsSimples() {
-        return ResponseEntity.ok(dashboardService.getStatsGlobales());
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRATEUR','ROLE_RESPONSABLE_STAGE')")
+    public ResponseEntity<DashboardStats> getStatsSimples(@RequestParam(required = false) String annee) {
+        return ResponseEntity.ok(dashboardService.getStatsGlobales(annee));
     }
 
     // GET /api/dashboard/complet
     @GetMapping("/complet")
-    @PreAuthorize("hasAnyRole('ADMINISTRATEUR','RESPONSABLE_STAGE')")
-    public ResponseEntity<DashboardCompletResponse> getDashboardComplet() {
-        return ResponseEntity.ok(dashboardService.getDashboardComplet());
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRATEUR','ROLE_RESPONSABLE_STAGE')")
+    public ResponseEntity<DashboardCompletResponse> getDashboardComplet(@RequestParam(required = false) String annee) {
+        return ResponseEntity.ok(dashboardService.getDashboardComplet(annee));
     }
 
     // GET /api/dashboard/stats/encadrant/{id}
     @GetMapping("/stats/encadrant/{id}")
-    @PreAuthorize("hasAnyRole('ENCADRANT','ADMINISTRATEUR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ENCADRANT','ROLE_ADMINISTRATEUR')")
     public ResponseEntity<DashboardStats> getStatsByEncadrant(@PathVariable Long id) {
         return ResponseEntity.ok(dashboardService.getStatsByEncadrant(id));
     }
 
     // GET /api/dashboard/export/global
     @GetMapping("/export/global")
-    @PreAuthorize("hasAnyRole('ADMINISTRATEUR','RESPONSABLE_STAGE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRATEUR','ROLE_RESPONSABLE_STAGE')")
     public ResponseEntity<byte[]> exporterRapportGlobal() {
         try {
             byte[] pdf = pdfExportService.genererRapportGlobal();
@@ -56,7 +56,7 @@ public class DashboardController {
 
     // GET /api/dashboard/export/stagiaire/{id}
     @GetMapping("/export/stagiaire/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRATEUR','RESPONSABLE_STAGE','ENCADRANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRATEUR','ROLE_RESPONSABLE_STAGE','ROLE_ENCADRANT')")
     public ResponseEntity<byte[]> exporterRapportStagiaire(@PathVariable Long id) {
         try {
             byte[] pdf = pdfExportService.genererRapportStagiaire(id);

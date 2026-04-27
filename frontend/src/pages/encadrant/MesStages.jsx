@@ -6,17 +6,18 @@ import Topbar from "../../components/common/Topbar";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getStagesByEncadrant } from "../../api/stageAPI";
-import { 
-  Briefcase, Users, Calendar, Search, 
-  Filter, ArrowRight, CheckCircle, Clock, 
-  AlertCircle, ChevronRight, Layers, Target
+import {
+  AlertCircle, ChevronRight, Layers, Target,
+  LayoutDashboard, ClipboardList, FileText, Star, Calendar, Briefcase, Search, Filter, Clock, CheckCircle
 } from 'lucide-react';
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/encadrant/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/encadrant/stages", icon: "📋", label: "Mes stages" },
-  { path: "/encadrant/reunions", icon: "📅", label: "Réunions" },
-  { path: "/encadrant/evaluations", icon: "⭐", label: "Évaluations" },
+  { path: "/encadrant/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/encadrant/stages", icon: <ClipboardList size={18} />, label: "Mes stages" },
+  { path: "/encadrant/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: "/encadrant/reunions", icon: <Calendar size={18} />, label: "Réunions" },
+  { path: "/encadrant/evaluations", icon: <Star size={18} />, label: "Évaluations" },
 ];
 
 const STATUT_CONFIG = {
@@ -30,6 +31,7 @@ const MesStages = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ const MesStages = () => {
 
   useEffect(() => {
     if (user?.id) loadStages();
-  }, [user]);
+  }, [user, activeSession]);
 
   const loadStages = async () => {
     setLoading(true);
@@ -56,7 +58,8 @@ const MesStages = () => {
     const matchesSearch = s.sujet?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           s.stagiaireNom?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filter === "ALL" || s.statut === filter;
-    return matchesSearch && matchesFilter;
+    const matchesSession = !s.annee || s.annee === activeSession;
+    return matchesSearch && matchesFilter && matchesSession;
   });
 
   return (
@@ -103,7 +106,7 @@ const MesStages = () => {
         ) : filteredStages.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="empty-state-elite">
              <div className="empty-icon-box">
-                <Layers size={64} />
+                <div style={{ marginBottom: 24, opacity: 0.1 }}><Layers size={64} /></div>
              </div>
              <h3>Aucun dossier trouvé</h3>
              <p>Ajustez vos filtres ou contactez le responsable pour plus d'informations.</p>

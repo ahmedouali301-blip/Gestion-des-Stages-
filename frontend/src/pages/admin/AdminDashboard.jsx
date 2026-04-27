@@ -20,15 +20,14 @@ import {
   Activity,
   Award,
   BookOpen,
-  ArrowUpRight,
-  MoreVertical,
   ChevronRight,
-  UserPlus
+  UserPlus,
+  LayoutDashboard
 } from 'lucide-react';
 
 const NAV = [
-  { path: "/admin/dashboard", icon: "⊞", label: "Tableau de bord" },
-  { path: "/admin/utilisateurs", icon: "👥", label: "Utilisateurs" },
+  { path: "/admin/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+  { path: "/admin/utilisateurs", icon: <Users size={18} />, label: "Utilisateurs" },
 ];
 
 function StatCard({ icon: Icon, label, value, color, delay, onClick, subtext, trend }) {

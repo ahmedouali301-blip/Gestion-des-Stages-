@@ -10,34 +10,37 @@ import {
   User, Mail, Phone, Shield, Lock, 
   Palette, Sun, Moon, CheckCircle, 
   AlertCircle, Key, Save, Fingerprint, Camera,
-  Briefcase, Activity, ShieldCheck, Zap
+  Briefcase, Activity, ShieldCheck, Zap,
+  LayoutDashboard, Users, ClipboardList, FileText, 
+  GraduationCap, BarChart, Calendar, Star, RefreshCw, CheckSquare
 } from "lucide-react";
 
 const NAV_MAP = {
   ROLE_ADMINISTRATEUR: [
-    { path: "/admin/dashboard", icon: "⊞", label: "Tableau de bord" },
-    { path: "/admin/utilisateurs", icon: "👥", label: "Utilisateurs" },
+    { path: "/admin/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+    { path: "/admin/utilisateurs", icon: <Users size={18} />, label: "Utilisateurs" },
   ],
   ROLE_RESPONSABLE_STAGE: [
-    { path: "/responsable/dashboard", icon: "⊞", label: "Tableau de bord" },
-    { path: "/responsable/stages", icon: "📋", label: "Stages" },
-    { path: "/responsable/sujets", icon: "📝", label: "Sujets" },
-    { path: "/responsable/stagiaires", icon: "🎓", label: "Stagiaires" },
-    { path: "/responsable/analytique", icon: "📊", label: "Analytique" },
+    { path: "/responsable/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+    { path: "/responsable/stages", icon: <ClipboardList size={18} />, label: "Stages" },
+    { path: "/responsable/sujets", icon: <FileText size={18} />, label: "Sujets" },
+    { path: "/responsable/stagiaires", icon: <GraduationCap size={18} />, label: "Stagiaires" },
+    { path: "/responsable/analytique", icon: <BarChart size={18} />, label: "Analytique" },
   ],
   ROLE_ENCADRANT: [
-    { path: "/encadrant/dashboard", icon: "⊞", label: "Tableau de bord" },
-    { path: "/encadrant/stages", icon: "📋", label: "Mes stages" },
-    { path: "/encadrant/reunions", icon: "📅", label: "Réunions" },
-    { path: "/encadrant/evaluations", icon: "⭐", label: "Évaluations" },
+    { path: "/encadrant/dashboard", icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
+    { path: "/encadrant/stages", icon: <ClipboardList size={18} />, label: "Mes stages" },
+    { path: "/encadrant/sujets", icon: <FileText size={18} />, label: "Sujets" },
+    { path: "/encadrant/reunions", icon: <Calendar size={18} />, label: "Réunions" },
+    { path: "/encadrant/evaluations", icon: <Star size={18} />, label: "Évaluations" },
   ],
   ROLE_STAGIAIRE: [
-    { path: "/stagiaire/dashboard", icon: "⊞", label: "Mon espace" },
-    { path: "/stagiaire/sujets", icon: "📝", label: "Sujets" },
-    { path: "/stagiaire/sprints", icon: "🔄", label: "Mes sprints" },
-    { path: "/stagiaire/taches", icon: "✅", label: "Mes tâches" },
-    { path: "/stagiaire/reunions", icon: "📅", label: "Mes réunions" },
-    { path: "/stagiaire/evaluations", icon: "⭐", label: "Mes évaluations" },
+    { path: "/stagiaire/dashboard", icon: <LayoutDashboard size={18} />, label: "Mon espace" },
+    { path: "/stagiaire/sujets", icon: <FileText size={18} />, label: "Sujets" },
+    { path: "/stagiaire/sprints", icon: <RefreshCw size={18} />, label: "Mes sprints" },
+    { path: "/stagiaire/taches", icon: <CheckCircle size={18} />, label: "Mes tâches" },
+    { path: "/stagiaire/reunions", icon: <Calendar size={18} />, label: "Mes réunions" },
+    { path: "/stagiaire/evaluations", icon: <Star size={18} />, label: "Mes évaluations" },
   ],
 };
 
@@ -163,18 +166,18 @@ export default function MonProfil() {
                     <div className="grid-2">
                        <div className="form-group-v3">
                           <label>Prénom</label>
-                          <input value={infoForm.prenom} onChange={fi("prenom")} required />
+                          <input value={infoForm.prenom} onChange={fi("prenom")} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} required />
                        </div>
                        <div className="form-group-v3">
                           <label>Nom</label>
-                          <input value={infoForm.nom} onChange={fi("nom")} required />
+                          <input value={infoForm.nom} onChange={fi("nom")} onKeyPress={(e) => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} required />
                        </div>
                     </div>
                     <div className="form-group-v3 mt-4">
                        <label>Contact Téléphonique</label>
                        <div className="input-group-v2">
                           <Phone size={18} />
-                          <input value={infoForm.telephone} onChange={fi("telephone")} pattern="\d{8}" maxLength={8} required />
+                          <input value={infoForm.telephone} onChange={fi("telephone")} onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }} pattern="\d{8}" maxLength={8} required />
                        </div>
                     </div>
                     <div className="form-actions-end">

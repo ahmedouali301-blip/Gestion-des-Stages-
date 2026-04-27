@@ -7,17 +7,19 @@ import { useAuth }  from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getStatsByEncadrant } from '../../api/dashboardAPI';
 import { getStagesByEncadrant } from '../../api/stageAPI';
+import { useSession } from '../../context/SessionContext';
 import { 
   Users, Briefcase, Star, LayoutGrid, 
-  ArrowRight, Award, Clock, ChevronRight,
-  TrendingUp, Calendar, RefreshCw, Mail
+  TrendingUp, Calendar, RefreshCw, Mail,
+  LayoutDashboard, ClipboardList, FileText, Award, ChevronRight, Clock, ArrowRight
 } from 'lucide-react';
 
 const NAV = [
-  { path: '/encadrant/dashboard',   icon: '⊞', label: 'Tableau de bord' },
-  { path: '/encadrant/stages',      icon: '📋', label: 'Mes stages'      },
-  { path: '/encadrant/reunions',    icon: '📅', label: 'Réunions'        },
-  { path: '/encadrant/evaluations', icon: '⭐', label: 'Évaluations'     },
+  { path: '/encadrant/dashboard',   icon: <LayoutDashboard size={18} />, label: 'Tableau de bord' },
+  { path: '/encadrant/stages',      icon: <ClipboardList size={18} />, label: 'Mes stages'      },
+  { path: '/encadrant/sujets',      icon: <FileText size={18} />, label: 'Sujets'          },
+  { path: '/encadrant/reunions',    icon: <Calendar size={18} />, label: 'Réunions'        },
+  { path: '/encadrant/evaluations', icon: <Star size={18} />, label: 'Évaluations'     },
 ];
 
 function PremiumStatCard({ icon: Icon, label, value, color, delay = 0 }) {
@@ -44,6 +46,7 @@ function PremiumStatCard({ icon: Icon, label, value, color, delay = 0 }) {
 export default function EncadrantDashboard() {
   const { user }        = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
   const navigate        = useNavigate();
 
   const [stats,   setStats]   = useState(null);
@@ -53,7 +56,7 @@ export default function EncadrantDashboard() {
   useEffect(() => {
     if (!user?.id) return;
     loadData();
-  }, [user]);
+  }, [user, activeSession]);
 
   const loadData = async () => {
     setLoading(true);
@@ -63,7 +66,9 @@ export default function EncadrantDashboard() {
         getStagesByEncadrant(user.id)
       ]);
       setStats(sRes.data);
-      setStages(stRes.data);
+      // Filter stages by active session
+      const filtered = (stRes.data || []).filter(s => !s.annee || s.annee === activeSession);
+      setStages(filtered);
     } catch (err) {
       console.error("Dashboard error", err);
     } finally {

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { SessionProvider } from './context/SessionContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import { ROLES } from './utils/roleHelpers';
 
@@ -39,80 +40,83 @@ import MesEvaluations from './pages/stagiaire/MesEvaluations';
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <Routes>
+      <SessionProvider>
+        <AuthProvider>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Routes>
 
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/" element={<Navigate to="/login" replace />} />
 
-            {/* ── Admin ── */}
-            <Route path="/admin/*" element={
-              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-                <Routes>
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="utilisateurs" element={<GestionUtilisateurs />} />
-                  <Route path="profil" element={<MonProfil />} />
-                  <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-                </Routes>
-              </ProtectedRoute>
-            } />
+              {/* ── Admin ── */}
+              <Route path="/admin/*" element={
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                  <Routes>
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="utilisateurs" element={<GestionUtilisateurs />} />
+                    <Route path="profil" element={<MonProfil />} />
+                    <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+                  </Routes>
+                </ProtectedRoute>
+              } />
 
-            {/* ── Responsable ── */}
-            <Route path="/responsable/*" element={
-              <ProtectedRoute allowedRoles={[ROLES.RESPONSABLE]}>
-                <Routes>
-                  <Route path="dashboard" element={<ResponsableDashboard />} />
-                  <Route path="stages" element={<GestionStages />} />
-                  <Route path="sujets" element={<GestionSujets />} />
-                  <Route path="stagiaires" element={<GestionStagiaires />} />
-                  <Route path="analytique" element={<TableauDeBord />} />
+              {/* ── Responsable ── */}
+              <Route path="/responsable/*" element={
+                <ProtectedRoute allowedRoles={[ROLES.RESPONSABLE]}>
+                  <Routes>
+                    <Route path="dashboard" element={<ResponsableDashboard />} />
+                    <Route path="stages" element={<GestionStages />} />
+                    <Route path="sujets" element={<GestionSujets />} />
+                    <Route path="stagiaires" element={<GestionStagiaires />} />
+                    <Route path="analytique" element={<TableauDeBord />} />
 
-                  <Route path="profil" element={<MonProfil />} />
-                  <Route path="*" element={<Navigate to="/responsable/dashboard" replace />} />
-                </Routes>
-              </ProtectedRoute>
-            } />
+                    <Route path="profil" element={<MonProfil />} />
+                    <Route path="*" element={<Navigate to="/responsable/dashboard" replace />} />
+                  </Routes>
+                </ProtectedRoute>
+              } />
 
-            {/* ── Encadrant ── */}
-            <Route path="/encadrant/*" element={
-              <ProtectedRoute allowedRoles={[ROLES.ENCADRANT]}>
-                <Routes>
-                  <Route path="dashboard" element={<EncadrantDashboard />} />
-                  <Route path="stages" element={<MesStages />} />
-                  <Route path="sprints/:stageId" element={<SprintManager />} />
-                  <Route path="taches/:stageId" element={<GestionTaches />} />
-                  <Route path="reunions" element={<GestionReunions />} />
-                  <Route path="evaluations" element={<GestionEvaluations />} />
-                  <Route path="profil" element={<MonProfil />} />
-                  <Route path="*" element={<Navigate to="/encadrant/dashboard" replace />} />
-                </Routes>
-              </ProtectedRoute>
-            } />
+              {/* ── Encadrant ── */}
+              <Route path="/encadrant/*" element={
+                <ProtectedRoute allowedRoles={[ROLES.ENCADRANT]}>
+                  <Routes>
+                    <Route path="dashboard" element={<EncadrantDashboard />} />
+                    <Route path="stages" element={<MesStages />} />
+                    <Route path="sujets" element={<GestionSujets />} />
+                    <Route path="sprints/:stageId" element={<SprintManager />} />
+                    <Route path="taches/:stageId" element={<GestionTaches />} />
+                    <Route path="reunions" element={<GestionReunions />} />
+                    <Route path="evaluations" element={<GestionEvaluations />} />
+                    <Route path="profil" element={<MonProfil />} />
+                    <Route path="*" element={<Navigate to="/encadrant/dashboard" replace />} />
+                  </Routes>
+                </ProtectedRoute>
+              } />
 
-            {/* ── Stagiaire ── */}
-            <Route path="/stagiaire/*" element={
-              <ProtectedRoute allowedRoles={[ROLES.STAGIAIRE]}>
-                <Routes>
-                  <Route path="dashboard" element={<StagiaireDashboard />} />
-                  <Route path="sujets" element={<MesSujets />} />
-                  <Route path="sprints" element={<MesSprints />} />
-                  <Route path="taches" element={<MesTaches />} />
-                  <Route path="reunions" element={<MesReunions />} />
-                  <Route path="evaluations" element={<MesEvaluations />} />
-                  <Route path="profil" element={<MonProfil />} />
-                  <Route path="*" element={<Navigate to="/stagiaire/dashboard" replace />} />
-                </Routes>
-              </ProtectedRoute>
-            } />
+              {/* ── Stagiaire ── */}
+              <Route path="/stagiaire/*" element={
+                <ProtectedRoute allowedRoles={[ROLES.STAGIAIRE]}>
+                  <Routes>
+                    <Route path="dashboard" element={<StagiaireDashboard />} />
+                    <Route path="sujets" element={<MesSujets />} />
+                    <Route path="sprints" element={<MesSprints />} />
+                    <Route path="taches" element={<MesTaches />} />
+                    <Route path="reunions" element={<MesReunions />} />
+                    <Route path="evaluations" element={<MesEvaluations />} />
+                    <Route path="profil" element={<MonProfil />} />
+                    <Route path="*" element={<Navigate to="/stagiaire/dashboard" replace />} />
+                  </Routes>
+                </ProtectedRoute>
+              } />
 
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </SessionProvider>
     </ThemeProvider>
   );
 }

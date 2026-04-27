@@ -15,6 +15,7 @@ public class StagiaireIdentiteService {
 
     private final StagiaireIdentiteRepository identiteRepo;
     private final UtilisateurRepository utilisateurRepo;
+    private final NotificationService notificationService;
 
     public StagiaireIdentiteResponse creer(StagiaireIdentiteRequest req) {
         if (identiteRepo.existsByEmail(req.getEmail()))
@@ -38,7 +39,21 @@ public class StagiaireIdentiteService {
         s.setCin(req.getCin());
         s.setCompteCreer(false);
         s.setResponsable(responsable);
-        return toResponse(identiteRepo.save(s));
+        StagiaireIdentite saved = identiteRepo.save(s);
+
+        // --- NOTIFICATION ADMIN ---
+        List<Utilisateur> admins = utilisateurRepo.findByRole(com.clinisys.enums.Role.ROLE_ADMINISTRATEUR);
+        for (Utilisateur admin : admins) {
+            notificationService.envoyerNotification(
+                admin,
+                "Nouvelle Identité Stagiaire",
+                "Le responsable " + responsable.getPrenom() + " " + responsable.getNom() + " a créé l'identité de " + s.getPrenom() + " " + s.getNom() + ". Un compte doit être généré.",
+                "SUJET_NOUVELLE_IDENTITE",
+                null
+            );
+        }
+
+        return toResponse(saved);
     }
 
     public List<StagiaireIdentiteResponse> getAll() {

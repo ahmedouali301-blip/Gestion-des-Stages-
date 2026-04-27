@@ -9,24 +9,20 @@ import {
   getTachesByStage,
   mettreAJourTache,
   creerTachePourStage,
+  deleteTacheSimple,
 } from '../../api/tacheAPI';
 import { getStagesByStagiaire } from '../../api/stageAPI';
-import ConfirmModal from '../../components/common/ConfirmModal';
-import { 
-  CheckSquare, Plus, Search, Filter, 
-  Clock, Activity, CheckCircle, Play, 
-  RotateCcw, Trash2, Layers, AlertCircle,
-  Briefcase, TrendingUp, Info, ChevronRight,
-  Target
-} from 'lucide-react';
+import { useSession } from '../../context/SessionContext';
+import { Target, ArrowRight, RefreshCw, CheckSquare, Plus, Search, Filter, Clock, Activity, CheckCircle, Play, RotateCcw, Trash2, Layers, AlertCircle, Briefcase, TrendingUp, Info, ChevronRight, LayoutDashboard, FileText, Star, Calendar } from 'lucide-react';
+import ClinisysAlert from '../../utils/SwalUtils';
 
 const NAV = [
-  { path: '/stagiaire/dashboard',   icon: '⊞', label: 'Mon espace'      },
-  { path: '/stagiaire/sujets',      icon: '📝', label: 'Sujets'          },
-  { path: '/stagiaire/sprints',     icon: '🔄', label: 'Mes sprints'     },
-  { path: '/stagiaire/taches',      icon: '✅', label: 'Mes tâches'      },
-  { path: '/stagiaire/reunions',    icon: '📅', label: 'Mes réunions'    },
-  { path: '/stagiaire/evaluations', icon: '⭐', label: 'Mes évaluations' },
+  { path: '/stagiaire/dashboard',   icon: <LayoutDashboard size={18} />, label: 'Mon espace'      },
+  { path: '/stagiaire/sujets',      icon: <FileText size={18} />, label: 'Sujets'          },
+  { path: '/stagiaire/sprints',     icon: <RefreshCw size={18} />, label: 'Mes sprints'     },
+  { path: '/stagiaire/taches',      icon: <CheckCircle size={18} />, label: 'Mes tâches'      },
+  { path: '/stagiaire/reunions',    icon: <Calendar size={18} />, label: 'Mes réunions'    },
+  { path: '/stagiaire/evaluations', icon: <Star size={18} />, label: 'Mes évaluations' },
 ];
 
 const STATUT_CONFIG = {
@@ -62,6 +58,7 @@ const EMPTY_FORM = { titre:'', description:'', priorite:'MOYENNE', dateEcheance:
 export default function MesTaches() {
   const { user }        = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [tachesAffectees,    setTachesAffectees]    = useState([]);
   const [tachesNonAffectees, setTachesNonAffectees] = useState([]);
@@ -72,31 +69,17 @@ export default function MesTaches() {
   const [loading,        setLoading]        = useState(true);
   const [stageId,        setStageId]        = useState(null);
   const [stageSujet,     setStageSujet]     = useState('');
+  const [stageStatus,    setStageStatus]    = useState('');
 
   const [showModal,      setShowModal]      = useState(false);
   const [form,           setForm]           = useState(EMPTY_FORM);
   const [saving,         setSaving]         = useState(false);
 
-  const [confirm, setConfirm] = useState({ 
-    isOpen: false, 
-    title: "", 
-    message: "", 
-    type: "primary", 
-    onConfirm: () => {} 
-  });
 
-  const closeConfirm = () => setConfirm(prev => ({ ...prev, isOpen: false }));
-  const alertError = (msg) => setConfirm({
-    isOpen: true,
-    title: "Action Interdite",
-    message: msg,
-    type: "warning",
-    confirmText: "Compris",
-    onConfirm: closeConfirm,
-    showCancel: false
-  });
 
-  useEffect(() => { if (user?.id) loadAll(); }, [user]);
+  const alertError = (msg) => ClinisysAlert.error("Action Interdite", msg);
+
+  useEffect(() => { if (user?.id) loadAll(); }, [user, activeSession]);
 
   useEffect(() => {
     let liste = affectFilter === 'TOUS' ? [...tachesAffectees, ...tachesNonAffectees] : (affectFilter === 'AFFECTEE' ? [...tachesAffectees] : [...tachesNonAffectees]);
@@ -112,9 +95,11 @@ export default function MesTaches() {
     setLoading(true);
     try {
       const stagesRes = await getStagesByStagiaire(user.id);
-      const stageActif = (stagesRes.data || []).find(s => s.statut === 'EN_COURS' || s.statut === 'EN_ATTENTE') || stagesRes.data?.[0];
+      const stages = (stagesRes.data || []).filter(s => !s.annee || String(s.annee) === String(activeSession));
+      const stageActif = stages.find(s => s.statut === 'EN_COURS' || s.statut === 'EN_ATTENTE') || stages[0];
       if (stageActif) {
         setStageId(stageActif.id); setStageSujet(stageActif.sujet);
+        setStageStatus(stageActif.statut);
         const [affecteesRes, toutesRes] = await Promise.all([ getTachesByStagiaire(user.id), getTachesByStage(stageActif.id) ]);
         
         let affectees = affecteesRes.data || [];
@@ -153,9 +138,14 @@ export default function MesTaches() {
               <h1 className="gradient-text">Centre d'Activités</h1>
               <p>{stageSujet || 'Pilotez votre backlog quotidien'}</p>
            </div>
-           <button className="btn btn-primary elite-btn" onClick={() => setShowModal(true)} disabled={!stageId}>
-              <Plus size={18} /> <span>Formuler une Tâche</span>
-           </button>
+           {stageStatus !== 'VALIDE' && (
+              <button className="btn btn-primary elite-btn" onClick={() => setShowModal(true)} disabled={!stageId}>
+                 <Plus size={18} /> <span>Formuler une Tâche</span>
+              </button>
+           )}
+           {stageStatus === 'VALIDE' && (
+              <div className="locked-badge-st-v2"><RotateCcw size={14} /> ARCHIVES</div>
+           )}
         </header>
 
         {/* WORK LOG KPIs */}
@@ -204,7 +194,7 @@ export default function MesTaches() {
           <div className="loader-center"><RefreshCw className="spin" size={40} /> Synchronisation des flux...</div>
         ) : filtered.length === 0 ? (
           <div className="empty-tasks-state">
-             <div className="icon-pulse"><CheckSquare size={64} /></div>
+             <div className="icon-pulse" style={{ color: 'var(--primary)', marginBottom: 24, opacity: 0.2 }}><CheckSquare size={64} /></div>
              <h3>Aucune activité détectée</h3>
              <p>Votre flux de travail est actuellement vide. Formulez une tâche ou attendez l'affectation de votre encadrant.</p>
           </div>
@@ -217,7 +207,13 @@ export default function MesTaches() {
                const prio = PRIORITE_CONFIG[t.priorite] || PRIORITE_CONFIG.MOYENNE;
 
                return (
-                 <motion.div initial={{ opacity:0, x:-20 }} animate={{ opacity:1, x:0 }} transition={{ delay: idx*0.05 }} key={t.id} className={`task-premium-row ${isBacklog ? 'is-backlog' : ''}`}>
+                 <motion.div 
+                   initial={{ opacity:0, x:-20 }} 
+                   animate={{ opacity:1, x:0 }} 
+                   transition={{ delay: idx*0.05 }} 
+                   key={isBacklog ? `backlog-${t.id}` : `sprint-${t.id}`} 
+                   className={`task-premium-row ${isBacklog ? 'is-backlog' : ''}`}
+                 >
                     <div className="prio-marker" style={{ background: prio.color }} />
                     <div className="task-main-info">
                        <div className="task-row-top">
@@ -235,10 +231,13 @@ export default function MesTaches() {
                     </div>
                     
                     <div className="task-row-ops">
-                       {trans.map(tr => (
+                       {stageStatus !== 'VALIDE' && trans.map(tr => (
                          <button key={tr.statut} className={`op-btn-v2 ${tr.cls}`} onClick={() => {
                             mettreAJourTache(t.id, {statut: tr.statut})
-                              .then(loadAll)
+                              .then(() => {
+                                loadAll();
+                                ClinisysAlert.success("Tâche mise à jour");
+                              })
                               .catch(err => {
                                 alertError(err.response?.data?.message || err.response?.data || "Erreur lors de la mise à jour");
                               });
@@ -246,7 +245,27 @@ export default function MesTaches() {
                             <tr.icon size={14} /> <span>{tr.label}</span>
                          </button>
                        ))}
-                       {isBacklog && <div className="backlog-hint">Affectez cette tâche dans "Mes Sprints" <ArrowRight size={14} /></div>}
+                       {stageStatus === 'VALIDE' && !isBacklog && (
+                          <div className="status-fixed"><CheckCircle size={14} /> Statut Scellé</div>
+                       )}
+                       {isBacklog && (
+                          <div className="backlog-ops-wrapper">
+                             <div className="backlog-hint">Affectez cette tâche dans "Mes Sprints" <ArrowRight size={14} /></div>
+                             {stageStatus !== 'VALIDE' && (
+                                <button className="btn-delete-backlog" onClick={() => ClinisysAlert.confirm({
+                                   title: "Supprimer la tâche",
+                                   text: "Voulez-vous supprimer définitivement cette tâche du backlog ?",
+                                   confirmText: "Supprimer",
+                                   danger: true
+                                }).then(res => res.isConfirmed && deleteTacheSimple(t.id).then(() => {
+                                   loadAll();
+                                   ClinisysAlert.success("Tâche supprimée du backlog");
+                                }))}>
+                                   <Trash2 size={16} />
+                                </button>
+                             )}
+                          </div>
+                       )}
                     </div>
                  </motion.div>
                );
@@ -254,16 +273,7 @@ export default function MesTaches() {
           </div>
         )}
 
-        <ConfirmModal 
-          isOpen={confirm.isOpen}
-          title={confirm.title}
-          message={confirm.message}
-          type={confirm.type}
-          onClose={closeConfirm}
-          onConfirm={confirm.onConfirm}
-          confirmText={confirm.confirmText || "Confirmer"}
-          showCancel={confirm.showCancel !== false}
-        />
+        <div style={{ visibility: 'hidden', height: 0 }}></div>
 
         <AnimatePresence>
           {showModal && (
@@ -273,7 +283,7 @@ export default function MesTaches() {
                      <h2>Task Formulation</h2>
                      <p>Stage : {stageSujet}</p>
                   </div>
-                  <form onSubmit={(e) => { e.preventDefault(); setSaving(true); creerTachePourStage({...form, stageId: Number(stageId)}).then(() => { setShowModal(false); loadAll(); }).finally(() => setSaving(false)); }} className="elite-manager-form">
+                  <form onSubmit={(e) => { e.preventDefault(); setSaving(true); creerTachePourStage({...form, stageId: Number(stageId)}).then(() => { setShowModal(false); loadAll(); ClinisysAlert.success("Tâche injectée"); }).catch(() => alertError("Erreur lors de l'injection")).finally(() => setSaving(false)); }} className="elite-manager-form">
                      <div className="form-group-v3">
                         <label>Désignation</label>
                         <input value={form.titre} onChange={f('titre')} required placeholder="Ex: Intégration du moteur de recherche..." />
@@ -291,7 +301,15 @@ export default function MesTaches() {
                         </div>
                         <div className="form-group-v3">
                            <label>Estimation (Jours)</label>
-                           <input type="number" step="0.5" value={form.estimation} onChange={f('estimation')} placeholder="2.5" />
+                           <input 
+                             type="number" 
+                             step="1" 
+                             min="1"
+                             value={form.estimation} 
+                             onChange={f('estimation')} 
+                             onKeyPress={(e) => { if(!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                             placeholder="2" 
+                           />
                         </div>
                      </div>
                      <div className="modal-actions-v3">
@@ -343,7 +361,10 @@ export default function MesTaches() {
         .op-btn-v2.btn-success { background: #10b981; color: #fff; }
         .op-btn-v2.btn-outline { background: var(--surface); border: 1.5px solid var(--border); color: var(--text-2); }
         .op-btn-v2:hover { transform: scale(1.05); }
-        .backlog-hint { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 8px; font-style: italic; font-weight: 700; width: 220px; justify-content: flex-end; }
+        .backlog-ops-wrapper { display: flex; align-items: center; gap: 16px; flex: 1; justify-content: flex-end; }
+        .backlog-hint { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 8px; font-style: italic; font-weight: 700; }
+        .btn-delete-backlog { width: 40px; height: 40px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text-3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+        .btn-delete-backlog:hover { background: rgba(239,68,68,0.1); color: #ef4444; border-color: #ef4444; transform: scale(1.1); }
 
         .elite-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .elite-modal-card { background: var(--surface); width: 100%; max-width: 520px; border-radius: 28px; padding: 40px; box-shadow: 0 40px 100px rgba(0,0,0,0.2); }
@@ -358,9 +379,9 @@ export default function MesTaches() {
         .loader-center { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 80px; color: var(--text-3); font-weight: 700; }
         .icon-pulse { animation: iconPulse 2s infinite; color: var(--primary); margin-bottom: 24px; opacity: 0.2; }
         @keyframes iconPulse { 0% { opacity:0.1; transform:scale(0.9); } 50% { opacity:0.3; transform:scale(1.1); } 100% { opacity:0.1; transform:scale(0.9); } }
+        .locked-badge-st-v2 { display: flex; align-items: center; gap: 8px; padding: 10px 24px; background: var(--bg-alpha); color: var(--text-3); border-radius: 14px; font-size: 11px; font-weight: 900; letter-spacing: 1px; border: 1.5px solid var(--border); }
+        .status-fixed { font-size: 11px; font-weight: 800; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
       ` }} />
     </div>
   );
 }
-
-import { ArrowRight, RefreshCw } from 'lucide-react';

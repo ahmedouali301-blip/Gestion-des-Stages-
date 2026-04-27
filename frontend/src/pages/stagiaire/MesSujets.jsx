@@ -10,21 +10,20 @@ import {
   choisirSujet,
   annulerChoix,
 } from "../../api/sujetAPI";
-import ConfirmModal from "../../components/common/ConfirmModal";
-import { 
-  BookOpen, Search, Filter, CheckCircle, 
-  Clock, XCircle, Info, Users, 
-  Calendar, Layers, ArrowRight, Star,
-  Check, Lock, Megaphone, Sparkles
+import {
+  Check, Lock, Megaphone, Sparkles, RefreshCw, AlertCircle,
+  LayoutDashboard, FileText, CheckSquare, Calendar, Star, Search, Users, ArrowRight, Layers, Clock, CheckCircle, BookOpen
 } from 'lucide-react';
+import ClinisysAlert from "../../utils/SwalUtils";
+import { useSession } from "../../context/SessionContext";
 
 const NAV = [
-  { path: "/stagiaire/dashboard", icon: "⊞", label: "Mon espace" },
-  { path: "/stagiaire/sujets", icon: "📝", label: "Sujets" },
-  { path: '/stagiaire/sprints',     icon: '🔄', label: 'Mes sprints'     },
-  { path: "/stagiaire/taches", icon: "✅", label: "Mes tâches" },
-  { path: "/stagiaire/reunions", icon: "📅", label: "Mes réunions" },
-  { path: "/stagiaire/evaluations", icon: "⭐", label: "Mes évaluations" },
+  { path: "/stagiaire/dashboard", icon: <LayoutDashboard size={18} />, label: "Mon espace" },
+  { path: "/stagiaire/sujets", icon: <FileText size={18} />, label: "Sujets" },
+  { path: '/stagiaire/sprints',     icon: <RefreshCw size={18} />, label: 'Mes sprints'     },
+  { path: "/stagiaire/taches", icon: <CheckSquare size={18} />, label: "Mes tâches" },
+  { path: "/stagiaire/reunions", icon: <Calendar size={18} />, label: "Mes réunions" },
+  { path: "/stagiaire/evaluations", icon: <Star size={18} />, label: "Mes évaluations" },
 ];
 
 const TYPE_CONFIG = {
@@ -36,35 +35,51 @@ const TYPE_CONFIG = {
 export default function MesSujets() {
   const { user } = useAuth();
   const { sidebarMini } = useTheme();
+  const { activeSession } = useSession();
 
   const [sujets, setSujets] = useState([]);
   const [monChoix, setMonChoix] = useState(null);
+  const [stageActif, setStageActif] = useState(null);
+  const [hasValidatedStage, setHasValidatedStage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("TOUS");
-
-  const [confirm, setConfirm] = useState({ isOpen: false, title: "", message: "", confirmText: "Confirmer", type: "primary", onConfirm: () => {} });
-
-  const closeConfirm = () => setConfirm((p) => ({ ...p, isOpen: false }));
+  const [hasFreeDossier, setHasFreeDossier] = useState(true);
 
   useEffect(() => {
     if (user?.id) loadAll();
-  }, [user]);
+  }, [user, activeSession]);
 
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [sujetsRes, choixRes] = await Promise.all([
-        getSujetsDisponibles(),
+      const { getStagesByStagiaire } = await import("../../api/stageAPI");
+      const { getDossiersByStagiaire } = await import("../../api/dossierStageAPI");
+      
+      const [sujetsRes, choixRes, stagesRes, dossiersRes] = await Promise.all([
+        getSujetsDisponibles(activeSession),
         getMonChoix(user.id).catch(() => ({ data: null })),
+        getStagesByStagiaire(user.id).catch(() => ({ data: [] })),
+        getDossiersByStagiaire(user.id).catch(() => ({ data: [] })),
       ]);
       setSujets(sujetsRes.data);
       setMonChoix(choixRes.data || null);
-    } catch {
-      setError("Erreur synchronisation catalogue");
+      
+      const active = (stagesRes.data || []).find(s => s.statut === 'EN_COURS' || s.statut === 'EN_ATTENTE');
+      setStageActif(active || null);
+      
+      const hasValidated = (stagesRes.data || []).some(s => s.statut === 'VALIDE' && (!s.annee || s.annee === activeSession));
+      setHasValidatedStage(hasValidated);
+
+      // Vérifier s'il y a un dossier "libre" (sans stage lié)
+      const allStages = stagesRes.data || [];
+      const hasFree = (dossiersRes.data || []).some(d => !allStages.some(s => s.dossierId === d.id));
+      setHasFreeDossier(hasFree);
+
+    } catch (err) {
+       console.error(err);
+      ClinisysAlert.error("Erreur", "Synchronisation catalogue échouée");
     } finally {
       setLoading(false);
     }
@@ -77,27 +92,29 @@ export default function MesSujets() {
     return matchType && matchSearch;
   });
 
+  const canChoose = !stageActif && !hasValidatedStage && hasFreeDossier && (!monChoix || monChoix.sujetStatut === "VALIDE" || monChoix.sujetStatut === "ARCHIVE");
+
   const handleChoisir = async (sujet) => {
-    setActionId(sujet.id); setError(""); setSuccess("");
+    setActionId(sujet.id);
     try {
       await choisirSujet(sujet.id, user.id);
-      setSuccess(`Optimisation réussie : Sujet "${sujet.titre}" réservé.`);
+      ClinisysAlert.success("Optimisation réussie", `Sujet "${sujet.titre}" réservé pour la session ${activeSession}.`);
       await loadAll();
     } catch (err) {
-      setError(err.response?.data?.message || "Échec de la réservation.");
+      ClinisysAlert.error("Échec", err.response?.data?.message || "Échec de la réservation.");
     } finally {
-      setActionId(null); closeConfirm();
+      setActionId(null);
     }
   };
 
   const handleAnnuler = async () => {
     try {
       await annulerChoix(user.id);
-      setSuccess("Réservation annulée. Le catalogue est de nouveau ouvert.");
+      ClinisysAlert.success("Catalogue ouvert", "Réservation annulée.");
       setMonChoix(null); await loadAll();
     } catch (err) {
-      setError("Échec de l'annulation.");
-    } finally { closeConfirm(); }
+      ClinisysAlert.error("Erreur", "Échec de l'annulation.");
+    }
   };
 
   return (
@@ -109,7 +126,7 @@ export default function MesSujets() {
         <header className="elite-subjects-header">
            <div className="title-stack">
               <h1 className="gradient-text">Catalogue des Projets</h1>
-              <p>Explorez et réservez votre sujet de stage pour la saison 2024</p>
+              <p>Explorez et réservez votre sujet de stage pour la session {activeSession}</p>
            </div>
            
            <div className="catalog-filters-elite">
@@ -127,59 +144,57 @@ export default function MesSujets() {
            </div>
         </header>
 
-        <AnimatePresence>
-          {(error || success) && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="status-banners-container">
-               {error && <div className="elite-banner danger"><XCircle size={18} /> {error}</div>}
-               {success && <div className="elite-banner success"><CheckCircle size={18} /> {success}</div>}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* CURRENT SELECTION HUB */}
-        {monChoix && (
+        {monChoix && (monChoix.sujetStatut !== "VALIDE" || stageActif) && (
           <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="my-selection-hub">
              <div className="hub-glass-bg"></div>
-             <div className="hub-indicator"><Sparkles size={16} /> RÉSERVATION ACTIVE</div>
+             <div className="hub-indicator"><Sparkles size={16} /> RÉSERVATION ACTIVE (SESSION {monChoix.sujetAnnee || activeSession})</div>
              <div className="hub-content">
                 <div className="hub-details">
                    <h3>{monChoix.sujetTitre}</h3>
                    <div className="hub-meta-grid">
                       <div className="h-m-item"><Layers size={14} /> <span>{TYPE_CONFIG[monChoix.sujetType]?.label || monChoix.sujetType}</span></div>
-                      <div className="h-m-item"><Calendar size={14} /> <span>{monChoix.sujetDateDebut} → {monChoix.sujetDateFin}</span></div>
                       <div className="h-m-item"><Clock size={14} /> <span>Réservé le {new Date(monChoix.dateChoix).toLocaleDateString()}</span></div>
                    </div>
                 </div>
                 <div className="hub-actions">
                    {monChoix.sujetStatut === "VALIDE" ? (
-                     <div className="validated-status"><Lock size={16} /> DOSSIER VALIDÉ</div>
+                      <div className="validated-status"><CheckCircle size={16} /> VALIDÉ PAR LE RESPONSABLE</div>
                    ) : (
-                     <button className="btn-cancel-reservation" onClick={() => setConfirm({
-                        isOpen: true, title: "Libérer le sujet", 
-                        message: "Votre réservation sera annulée et le sujet redeviendra disponible pour les autres candidats.",
-                        confirmText: "Annuler Réservation", type: "danger", onConfirm: handleAnnuler
-                     })}>LIBÉRER LE SUJET</button>
+                      <button className="btn-cancel-reservation" onClick={() => ClinisysAlert.confirm({
+                         title: "Libérer le sujet", 
+                         text: "Votre réservation sera annulée et le sujet redeviendra disponible pour les autres candidats.",
+                         confirmText: "Annuler Réservation",
+                         danger: true
+                      }).then(res => res.isConfirmed && handleAnnuler())}>LIBÉRER LE SUJET</button>
                    )}
                 </div>
              </div>
           </motion.section>
         )}
 
-        {!monChoix && !loading && (
+        {canChoose && !loading && (
           <div className="catalog-onboarding-alert">
              <Megaphone size={20} />
              <p>Le catalogue est ouvert. Sélectionnez un sujet pour initier votre processus d'affectation.</p>
           </div>
         )}
 
-        {/* SUBJECTS GRID */}
+        {!hasFreeDossier && !loading && !stageActif && !monChoix && (
+            <div className="catalog-onboarding-alert warning">
+               <AlertCircle size={20} />
+               <p>Attention : Vous n'avez aucun dossier de stage libre pour cette session. Veuillez créer un nouveau dossier avant de choisir un sujet.</p>
+               <button className="btn-go-dossier" onClick={() => window.location.href='/stagiaire/dashboard'}>Créer un Dossier</button>
+            </div>
+         )}
+
         {loading ? (
           <div className="loader-full"><RefreshCw className="spin" size={40} /> Synchronisation du catalogue...</div>
         ) : sujetsFiltres.length === 0 ? (
           <div className="empty-catalog-state">
-             <BookOpen size={64} opacity={0.1} />
+             <div style={{ marginBottom: 20, opacity: 0.1 }}><BookOpen size={64} /></div>
              <h3>Catalogue vide ou filtré</h3>
-             <p>Aucun sujet ne correspond à vos critères de recherche actuels.</p>
+             <p>Aucun sujet disponible pour la session {activeSession} correspondant à vos critères.</p>
           </div>
         ) : (
           <div className="subject-marketplace-grid">
@@ -208,7 +223,6 @@ export default function MesSujets() {
                     
                     <div className="s-card-footer">
                        <div className="footer-meta">
-                          <div className="f-m-item"><Calendar size={12} /> {s.dateDebut}</div>
                           <div className="f-m-item"><Users size={12} /> {s.nbMaxStagiaires === 2 ? 'Binôme' : 'Monôme'}</div>
                        </div>
                        
@@ -217,14 +231,15 @@ export default function MesSujets() {
                             <div className="status-selected"><Check size={16} /> VOTRE CHOIX</div>
                           ) : isFull ? (
                             <div className="status-full"><Lock size={14} /> COMPLET</div>
-                          ) : monChoix ? (
+                          ) : !canChoose ? (
                             <div className="status-blocked">Indisponible</div>
                           ) : (
-                            <button className="btn-select-subject" onClick={() => setConfirm({
-                               isOpen: true, title: "Engagement de Sujet",
-                               message: `Voulez-vous réserver le sujet "${s.titre}" ?`,
-                               confirmText: "Confirmer Choix", type: "primary", onConfirm: () => handleChoisir(s)
-                            })}>RÉSERVER <ArrowRight size={14} /></button>
+                             <button className="btn-select-subject" onClick={() => ClinisysAlert.confirm({
+                                title: "Engagement de Sujet",
+                                text: `Voulez-vous réserver le sujet "${s.titre}" ?`,
+                                confirmText: "Confirmer Choix",
+                                icon: 'info'
+                             }).then(res => res.isConfirmed && handleChoisir(s))}>RÉSERVER <ArrowRight size={14} /></button>
                           )}
                        </div>
                     </div>
@@ -236,11 +251,6 @@ export default function MesSujets() {
           </div>
         )}
       </main>
-
-      <ConfirmModal
-        isOpen={confirm.isOpen} title={confirm.title} message={confirm.message}
-        confirmText={confirm.confirmText} type={confirm.type} onClose={closeConfirm} onConfirm={confirm.onConfirm}
-      />
 
       <style dangerouslySetInnerHTML={{ __html: `
         .elite-subjects-header { display: flex; flex-direction: column; gap: 32px; margin-bottom: 40px; }
@@ -325,11 +335,13 @@ export default function MesSujets() {
           display: flex; align-items: center; gap: 8px; transition: 0.2s;
         }
         .btn-select-subject:hover { transform: scale(1.05); }
+        .catalog-onboarding-alert.warning { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.2); color: #d97706; }
+        .btn-go-dossier { margin-left: auto; background: #d97706; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer; }
 
         .selected-glow { position: absolute; inset: 0; pointer-events: none; border-radius: 24px; box-shadow: inset 0 0 0 2px var(--primary); }
+        .loader-full { padding: 100px; text-align: center; color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 16px; }
+        .empty-catalog-state { padding: 100px; text-align: center; color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 16px; }
       ` }} />
     </div>
   );
 }
-
-import { RefreshCw } from 'lucide-react';
