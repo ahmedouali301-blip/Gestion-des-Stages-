@@ -34,7 +34,7 @@ public class PdfExportService {
  
     // ── Rapport global ────────────────────────────────────────
     public byte[] genererRapportGlobal() throws Exception {
-        DashboardCompletResponse stats = dashboardService.getDashboardComplet();
+        DashboardCompletResponse stats = dashboardService.getDashboardComplet(null);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdf  = new PdfDocument(writer);

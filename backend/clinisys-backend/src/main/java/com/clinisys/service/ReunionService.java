@@ -72,10 +72,10 @@ public class ReunionService {
                 if (reunion.getEncadrant() == null && stage.getEncadrant() != null) {
                     reunion.setEncadrant(stage.getEncadrant());
                 }
-                if (reunion.getStagiaire() == null && stage.getStagiaire() != null) {
+                if (stage.getStagiaire() != null) {
                     reunion.setStagiaire(stage.getStagiaire());
                 }
-                if (reunion.getStagiaire2() == null && stage.getStagiaire2() != null) {
+                if (stage.getStagiaire2() != null) {
                     reunion.setStagiaire2(stage.getStagiaire2());
                 }
                 reunion.setStage(stage);
@@ -88,8 +88,21 @@ public class ReunionService {
         }
 
         if ("ROLE_STAGIAIRE".equals(roleCreateur)) {
-            reunion.setAcceptationStagiaire1(true);
-            reunion.setAcceptationStagiaire2(true);
+            if (req.getStagiaireId() != null && reunion.getStagiaire2() != null) {
+                if (reunion.getStagiaire() != null && req.getStagiaireId().equals(reunion.getStagiaire().getId())) {
+                    reunion.setAcceptationStagiaire1(true);
+                    reunion.setAcceptationStagiaire2(false);
+                } else if (reunion.getStagiaire2() != null && req.getStagiaireId().equals(reunion.getStagiaire2().getId())) {
+                    reunion.setAcceptationStagiaire1(false);
+                    reunion.setAcceptationStagiaire2(true);
+                } else {
+                    reunion.setAcceptationStagiaire1(true);
+                    reunion.setAcceptationStagiaire2(true);
+                }
+            } else {
+                reunion.setAcceptationStagiaire1(true);
+                reunion.setAcceptationStagiaire2(true);
+            }
             reunion.setAcceptationEncadrant(false);
         } else {
             reunion.setAcceptationEncadrant(true);

@@ -102,7 +102,7 @@ export default function MesTaches() {
         setStageStatus(stageActif.statut);
         const [affecteesRes, toutesRes] = await Promise.all([ getTachesByStagiaire(user.id), getTachesByStage(stageActif.id) ]);
         
-        let affectees = affecteesRes.data || [];
+        let affectees = (affecteesRes.data || []).filter(t => !t.annee || String(t.annee) === String(activeSession));
         
         // --- EVITER LES DOUBLONS ---
         // On regroupe par l'ID de la tâche de base (tache.id)

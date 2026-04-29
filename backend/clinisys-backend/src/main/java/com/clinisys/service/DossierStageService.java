@@ -40,9 +40,12 @@ public class DossierStageService {
         for (DossierStage dexist : dossiersExistants) {
             // Chercher le stage lié à ce dossier
             boolean hasValidatedStage = stageRepo.findAll().stream()
-                .anyMatch(s -> s.getDossier() != null && 
-                               s.getDossier().getId().equals(dexist.getId()) && 
-                               s.getStatut() == com.clinisys.enums.StatutStage.VALIDE);
+                .anyMatch(s -> s.getStatut() == com.clinisys.enums.StatutStage.VALIDE &&
+                               ((s.getDossier() != null && s.getDossier().getId().equals(dexist.getId())) ||
+                                ( (s.getStagiaire() != null && s.getStagiaire().getId().equals(stagiaire.getId())) || 
+                                  (s.getStagiaire2() != null && s.getStagiaire2().getId().equals(stagiaire.getId())) ) && 
+                                ( (s.getDossier() != null && s.getDossier().getAnneeStage().equals(dexist.getAnneeStage())) || 
+                                  (s.getSujetSession() != null && s.getSujetSession().getAnnee().equals(dexist.getAnneeStage())) )));
             
             if (!hasValidatedStage) {
                 throw new RuntimeException("Le stagiaire possède déjà un dossier (" + dexist.getAnneeStage() + ") sans stage validé. Un stage doit être effectué et validé pour ce dossier avant d'en créer un nouveau.");
