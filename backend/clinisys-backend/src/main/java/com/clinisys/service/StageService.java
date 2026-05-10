@@ -24,7 +24,6 @@ public class StageService {
     private final SujetRepository sujetRepository;
     private final SujetSessionRepository sujetSessionRepository;
     private final ChoixSujetRepository choixSujetRepository;
-    private final MouvementService mouvementService;
     private final NotificationService notificationService;
     private final DossierStageRepository dossierStageRepository;
 
@@ -97,7 +96,6 @@ public class StageService {
         }
 
         Stage savedStage = stageRepository.save(stage);
-        mouvementService.enregistrer("Création stage : " + stage.getSujet(), "STAGE_CREE", null);
         return toResponse(savedStage);
     }
 

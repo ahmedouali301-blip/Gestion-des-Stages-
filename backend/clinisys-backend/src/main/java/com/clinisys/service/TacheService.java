@@ -24,7 +24,6 @@ public class TacheService {
     private final StageRepository stageRepository;
     private final StagiaireRepository stagiaireRepository;
     private final SprintService sprintService;
-    private final MouvementService mouvementService;
     private final NotificationService notificationService;
 
     // ── Créer tâche pour un stage (sans sprint) ───────────────
@@ -153,9 +152,6 @@ public class TacheService {
         }
 
         sprintService.recalculerAvancement(sprint.getId());
-        mouvementService.enregistrer(
-                "Création d'une tâche : " + tache.getTitre() + " dans le sprint " + sprint.getNom(), "TACHE_CREEE",
-                null);
 
         // Notif
         String msgNotif = "Nouvelle tâche dans le sprint " + sprint.getNom() + " : " + tache.getTitre();
@@ -200,9 +196,6 @@ public class TacheService {
         ts.setStagiaire(stagiaire);
         ts.setStatut(StatutTache.EN_ATTENTE_VALIDATION);
         TacheSprint savedTs = tacheRepository.save(ts);
-        mouvementService.enregistrer(
-                "Le stagiaire " + stagiaire.getNom() + " a proposé une tâche : " + tache.getTitre(), "TACHE_PROPOSEE",
-                stagiaire);
 
         // Notif Encadrant
         Stage stage = sprint.getStage();
@@ -254,7 +247,6 @@ public class TacheService {
         }
 
         sprintService.recalculerAvancement(ts.getSprint().getId());
-        mouvementService.enregistrer("Validation de la tâche : " + ts.getTache().getTitre(), "TACHE_VALIDEE", null);
 
         // Notif Stagiaires
         String msgValid = "Votre tâche '" + ts.getTache().getTitre() + "' a été validée par l'encadrant.";
@@ -312,9 +304,6 @@ public class TacheService {
             ts.setDuree(req.getDuree());
         TacheSprint saved = tacheRepository.save(ts);
         if (req.getStatut() != null) {
-            mouvementService.enregistrer(
-                    "Mise à jour du statut de la tâche '" + ts.getTache().getTitre() + "' vers : " + req.getStatut(),
-                    "TACHE_STATUT_CHANGE", ts.getStagiaire());
 
             // --- Notification Encadrant ---
             Stage stage = ts.getSprint().getStage();

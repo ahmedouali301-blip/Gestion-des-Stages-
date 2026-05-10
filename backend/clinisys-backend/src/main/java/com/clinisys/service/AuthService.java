@@ -25,21 +25,37 @@ public class AuthService {
     private final EmailService emailService;
  
     public JwtResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getMotDePasse()));
- 
-        String token = tokenProvider.generateToken(authentication);
-        Utilisateur utilisateur = utilisateurRepository.findByEmail(request.getEmail())
-                .orElseThrow();
- 
-        return new JwtResponse(token, "Bearer",
-                utilisateur.getId(),
-                utilisateur.getNom(),
-                utilisateur.getPrenom(),
-                utilisateur.getEmail(),
-                utilisateur.getTelephone(),
-                utilisateur.getCin(),
-                utilisateur.getRole().name());
+        // 1. Vérifier si l'utilisateur existe par email
+        if (!utilisateurRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email introuvable. Veuillez vérifier votre adresse e-mail.");
+        }
+
+        try {
+            // 2. Tenter l'authentification
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getMotDePasse()));
+
+            String token = tokenProvider.generateToken(authentication);
+            Utilisateur utilisateur = utilisateurRepository.findByEmail(request.getEmail())
+                    .orElseThrow();
+
+            return new JwtResponse(token, "Bearer",
+                    utilisateur.getId(),
+                    utilisateur.getNom(),
+                    utilisateur.getPrenom(),
+                    utilisateur.getEmail(),
+                    utilisateur.getTelephone(),
+                    utilisateur.getCin(),
+                    utilisateur.getRole().name());
+
+        } catch (BadCredentialsException e) {
+            // 3. Si l'email était correct mais l'auth échoue, c'est le mot de passe
+            throw new RuntimeException("Mot de passe incorrect. Veuillez réessayer.");
+        } catch (DisabledException e) {
+            throw new RuntimeException("Votre compte est désactivé. Veuillez contacter l'administrateur.");
+        } catch (Exception e) {
+            throw new RuntimeException("Une erreur est survenue lors de l'authentification.");
+        }
     }
  
     public void register(RegisterRequest request) {

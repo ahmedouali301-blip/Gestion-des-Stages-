@@ -25,7 +25,6 @@ public class ReunionService {
     private final StagiaireRepository stagiaireRepository;
     private final StageRepository stageRepository;
     private final NotificationService notificationService;
-    private final MouvementService mouvementService;
 
     // ── Planifier une réunion ─────────────────────────────────
     @Transactional
@@ -34,7 +33,8 @@ public class ReunionService {
         if (req.getStageId() != null) {
             stageRepository.findById(req.getStageId()).ifPresent(stage -> {
                 if ("VALIDE".equals(stage.getStatut())) {
-                    throw new RuntimeException("Impossible de planifier une réunion pour un dossier déjà validé et scellé.");
+                    throw new RuntimeException(
+                            "Impossible de planifier une réunion pour un dossier déjà validé et scellé.");
                 }
             });
         }
@@ -92,7 +92,8 @@ public class ReunionService {
                 if (reunion.getStagiaire() != null && req.getStagiaireId().equals(reunion.getStagiaire().getId())) {
                     reunion.setAcceptationStagiaire1(true);
                     reunion.setAcceptationStagiaire2(false);
-                } else if (reunion.getStagiaire2() != null && req.getStagiaireId().equals(reunion.getStagiaire2().getId())) {
+                } else if (reunion.getStagiaire2() != null
+                        && req.getStagiaireId().equals(reunion.getStagiaire2().getId())) {
                     reunion.setAcceptationStagiaire1(false);
                     reunion.setAcceptationStagiaire2(true);
                 } else {
@@ -134,7 +135,6 @@ public class ReunionService {
             }
         }
 
-        mouvementService.enregistrer("Plannification d'une réunion : " + reunion.getTitre(), "REUNION_PLANIFIEE", null);
         return toResponse(saved);
     }
 
@@ -157,7 +157,6 @@ public class ReunionService {
             }
         }
         Reunion saved = reunionRepository.save(reunion);
-        mouvementService.enregistrer("L'encadrant a accepté la réunion : " + reunion.getTitre(), "REUNION_VALIDEE", reunion.getEncadrant());
         return toResponse(saved);
     }
 
@@ -235,7 +234,6 @@ public class ReunionService {
                 "REUNION_REPORTEE", reunion);
 
         Reunion saved = reunionRepository.save(reunion);
-        mouvementService.enregistrer("Demande de report de réunion : " + reunion.getTitre() + " par le stagiaire", "REUNION_REPORTEE", null);
         return toResponse(saved);
     }
 
@@ -308,7 +306,6 @@ public class ReunionService {
         reunion.setPv(pv);
         reunion.setStatut("TERMINEE");
         reunionRepository.save(reunion);
-        mouvementService.enregistrer("Rédaction du PV pour la réunion : " + reunion.getTitre(), "PV_REDIGE", redacteur);
         return toPvResponse(pv, reunion);
     }
 
@@ -399,7 +396,7 @@ public class ReunionService {
                 res.setAnnee(st.getSujetSession().getAnnee());
             }
         }
-        
+
         // Fallback ultime sur l'année de la réunion si toujours null
         if (res.getAnnee() == null && r.getDateHeure() != null) {
             res.setAnnee(String.valueOf(r.getDateHeure().getYear()));

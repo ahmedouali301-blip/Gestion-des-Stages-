@@ -18,14 +18,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SprintService {
 
-    private final SprintRepository     sprintRepository;
-    private final StageRepository      stageRepository;
-    private final TacheRepository      tacheRepository;
-    private final TacheBaseRepository  tacheBaseRepository;
+    private final SprintRepository sprintRepository;
+    private final StageRepository stageRepository;
+    private final TacheRepository tacheRepository;
+    private final TacheBaseRepository tacheBaseRepository;
     private final EvaluationRepository evaluationRepository;
-    private final ReunionRepository    reunionRepository;
-    private final NotificationService  notificationService;
-    private final MouvementService     mouvementService;
+    private final ReunionRepository reunionRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public SprintResponse creerSprint(SprintRequest req) {
@@ -54,11 +53,10 @@ public class SprintService {
 
             if (!estCloture) {
                 throw new RuntimeException(
-                    "Impossible de créer un nouveau sprint : le Sprint "
-                    + dernierSprint.getNumero()
-                    + " (" + dernierSprint.getNom() + ")"
-                    + " doit être clôturé d'abord."
-                );
+                        "Impossible de créer un nouveau sprint : le Sprint "
+                                + dernierSprint.getNumero()
+                                + " (" + dernierSprint.getNom() + ")"
+                                + " doit être clôturé d'abord.");
             }
         }
 
@@ -121,7 +119,8 @@ public class SprintService {
         if (req.getDatesMots() != null && !req.getDatesMots().isEmpty()) {
             int index = 1;
             for (LocalDateTime dateHeure : req.getDatesMots()) {
-                if (dateHeure == null) continue;
+                if (dateHeure == null)
+                    continue;
 
                 Reunion reunion = new Reunion();
                 reunion.setSprint(saved);
@@ -145,12 +144,15 @@ public class SprintService {
                 reunionRepository.save(reunion);
 
                 // Notification invitation réunion
-                String notifInvit = "Une nouvelle réunion a été proposée pour le Sprint " + req.getNumero() + " : " + reunion.getTitre();
+                String notifInvit = "Une nouvelle réunion a été proposée pour le Sprint " + req.getNumero() + " : "
+                        + reunion.getTitre();
                 if (stage.getStagiaire() != null) {
-                    notificationService.envoyerNotification(stage.getStagiaire(), "Invitation Réunion", notifInvit, "REUNION_PROPOSEE", reunion);
+                    notificationService.envoyerNotification(stage.getStagiaire(), "Invitation Réunion", notifInvit,
+                            "REUNION_PROPOSEE", reunion);
                 }
                 if (stage.getStagiaire2() != null) {
-                    notificationService.envoyerNotification(stage.getStagiaire2(), "Invitation Réunion", notifInvit, "REUNION_PROPOSEE", reunion);
+                    notificationService.envoyerNotification(stage.getStagiaire2(), "Invitation Réunion", notifInvit,
+                            "REUNION_PROPOSEE", reunion);
                 }
 
                 index++;
@@ -158,15 +160,16 @@ public class SprintService {
         }
 
         // --- Notification Stagiaire ---
-        String msgNotif = "Un nouveau sprint a été planifié : Sprint " + saved.getNumero() + " (" + saved.getNom() + ")";
+        String msgNotif = "Un nouveau sprint a été planifié : Sprint " + saved.getNumero() + " (" + saved.getNom()
+                + ")";
         if (stage.getStagiaire() != null) {
-            notificationService.envoyerNotification(stage.getStagiaire(), "Nouveau Sprint", msgNotif, "SPRINT_CREE", null);
+            notificationService.envoyerNotification(stage.getStagiaire(), "Nouveau Sprint", msgNotif, "SPRINT_CREE",
+                    null);
         }
         if (stage.getStagiaire2() != null) {
-            notificationService.envoyerNotification(stage.getStagiaire2(), "Nouveau Sprint", msgNotif, "SPRINT_CREE", null);
+            notificationService.envoyerNotification(stage.getStagiaire2(), "Nouveau Sprint", msgNotif, "SPRINT_CREE",
+                    null);
         }
-
-        mouvementService.enregistrer("Création du sprint " + saved.getNumero() + " pour le stage : " + stage.getSujet(), "SPRINT_CREE", null);
 
         return toResponse(saved);
     }
@@ -177,7 +180,7 @@ public class SprintService {
         Sprint sprint = getSprint(id);
         if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
             throw new RuntimeException("Le stage est déjà validé. Aucune modification possible.");
-            
+
         if (sprint.getStatut() != StatutSprint.PLANIFIE)
             throw new RuntimeException("Seul un sprint PLANIFIÉ peut être démarré");
         sprint.setStatut(StatutSprint.EN_COURS);
@@ -185,11 +188,11 @@ public class SprintService {
     }
 
     public SprintResponse cloturerSprint(Long id, boolean force) {
-        Sprint sprint  = getSprint(id);
+        Sprint sprint = getSprint(id);
         if (sprint.getStage().getStatut() == com.clinisys.enums.StatutStage.VALIDE)
             throw new RuntimeException("Le stage est déjà validé. Aucune modification possible.");
 
-        long total     = tacheRepository.countBySprintId(id);
+        long total = tacheRepository.countBySprintId(id);
         long terminees = tacheRepository.countTermineesBySprintId(id);
 
         if (total > terminees && !force)
@@ -207,21 +210,21 @@ public class SprintService {
         if (stage != null) {
             String msgNotif = "Le Sprint " + saved.getNumero() + " (" + saved.getNom() + ") a été clôturé.";
             if (stage.getStagiaire() != null) {
-                notificationService.envoyerNotification(stage.getStagiaire(), "Sprint Clôturé", msgNotif, "SPRINT_CLOTURE", null);
+                notificationService.envoyerNotification(stage.getStagiaire(), "Sprint Clôturé", msgNotif,
+                        "SPRINT_CLOTURE", null);
             }
             if (stage.getStagiaire2() != null) {
-                notificationService.envoyerNotification(stage.getStagiaire2(), "Sprint Clôturé", msgNotif, "SPRINT_CLOTURE", null);
+                notificationService.envoyerNotification(stage.getStagiaire2(), "Sprint Clôturé", msgNotif,
+                        "SPRINT_CLOTURE", null);
             }
         }
-
-        mouvementService.enregistrer("Clôture du sprint " + saved.getNumero() + " (" + saved.getNom() + ")", "SPRINT_CLOTURE", null);
 
         return toResponse(saved);
     }
 
     public Sprint recalculerAvancement(Long sprintId) {
-        Sprint sprint  = getSprint(sprintId);
-        long total     = tacheRepository.countBySprintId(sprintId);
+        Sprint sprint = getSprint(sprintId);
+        long total = tacheRepository.countBySprintId(sprintId);
         long terminees = tacheRepository.countTermineesBySprintId(sprintId);
         sprint.setTauxAvancement(
                 total == 0 ? 0.0 : (double) terminees / total * 100);
@@ -250,7 +253,8 @@ public class SprintService {
         // RÈGLE : Uniquement si VIDE
         long nbTaches = tacheRepository.countBySprintId(id);
         if (nbTaches > 0) {
-            throw new RuntimeException("Impossible de supprimer ce sprint car il contient encore des tâches affectées.");
+            throw new RuntimeException(
+                    "Impossible de supprimer ce sprint car il contient encore des tâches affectées.");
         }
 
         // Nettoyage des réunions automatiques liées
@@ -260,7 +264,6 @@ public class SprintService {
         }
 
         sprintRepository.deleteById(id);
-        mouvementService.enregistrer("Suppression du sprint " + sprint.getNumero() + " (" + sprint.getNom() + ")", "SPRINT_SUPPRIME", null);
     }
 
     private Sprint getSprint(Long id) {
@@ -284,7 +287,7 @@ public class SprintService {
             r.setStageId(s.getStage().getId());
             r.setStageSujet(s.getStage().getSujet());
         }
-        long total     = tacheRepository.countBySprintId(s.getId());
+        long total = tacheRepository.countBySprintId(s.getId());
         long terminees = tacheRepository.countTermineesBySprintId(s.getId());
         r.setNbTaches((int) total);
         r.setNbTachesTerminees((int) terminees);

@@ -19,7 +19,6 @@ public class SujetService {
     private final ChoixSujetRepository choixRepo;
     private final StagiaireRepository stagiaireRepo;
     private final UtilisateurRepository utilisateurRepo;
-    private final MouvementService mouvementService;
     private final NotificationService notificationService;
     private final StageRepository stageRepo;
     private final DossierStageRepository dossierRepo;
@@ -80,7 +79,6 @@ public class SujetService {
         session.setStatut("DISPONIBLE");
         
         SujetSession saved = sessionRepo.save(session);
-        mouvementService.enregistrer("Publication du sujet '" + master.getTitre() + "' pour la session " + req.getAnnee(), "SUJET_PUBLIE", null);
         return toSessionResponse(saved);
     }
 
@@ -98,7 +96,6 @@ public class SujetService {
             throw new RuntimeException("Impossible d'annuler la publication : des stagiaires ont déjà choisi ce sujet.");
         }
         
-        mouvementService.enregistrer("Annulation de la publication du sujet '" + s.getSujet().getTitre() + "' pour la session " + s.getAnnee(), "SUJET_DEPUBLIE", null);
         sessionRepo.delete(s);
     }
 
@@ -158,10 +155,9 @@ public class SujetService {
 
         if (choixRepo.countBySujetSessionId(sujetSessionId) >= occurrence.getNbMaxStagiaires()) {
             occurrence.setStatut("COMPLET");
-            sessionRepo.save(occurrence);
+        sessionRepo.save(occurrence);
         }
 
-        mouvementService.enregistrer("Le stagiaire " + stagiaire.getPrenom() + " a choisi le sujet : " + occurrence.getSujet().getTitre(), "SUJET_CHOISI", stagiaire);
         return toChoixResponse(saved);
     }
 
