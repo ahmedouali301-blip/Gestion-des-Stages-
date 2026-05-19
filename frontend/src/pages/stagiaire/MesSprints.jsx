@@ -324,7 +324,7 @@ export default function MesSprints() {
       </main>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .elite-roadmap-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; }
+        .elite-roadmap-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 40px; }
         .roadmap-stats { display: flex; gap: 32px; }
         .r-stat { display: flex; flex-direction: column; text-align: right; }
         .r-stat .lbl { font-size: 11px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: 1px; }

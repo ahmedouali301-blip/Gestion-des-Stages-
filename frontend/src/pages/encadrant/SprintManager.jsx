@@ -245,6 +245,10 @@ export default function SprintManager() {
   };
 
   const openAffecter = async (sprint) => {
+    if (sprint.statut === 'TERMINE' || sprint.statut === 'TERMINE_INCOMPLET') {
+      ClinisysAlert.error("Action Impossible", "Vous ne pouvez pas affecter des tâches à un sprint déjà terminé.");
+      return;
+    }
     setActiveSprint(sprint);
     setTachesSelectionnees([]);
     try {

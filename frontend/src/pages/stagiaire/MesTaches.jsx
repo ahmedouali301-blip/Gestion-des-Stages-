@@ -324,7 +324,7 @@ export default function MesTaches() {
       </main>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .elite-tasks-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; }
+        .elite-tasks-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 40px; }
         .title-stack p { color: var(--text-3); font-size: 16px; margin-top: 4px; }
         
         .elite-mini-stat-v2 { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; min-width: 180px; }

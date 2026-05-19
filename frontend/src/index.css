@@ -172,6 +172,7 @@ select:focus {
   min-height: calc(100vh - var(--topbar-h));
   transition: margin-left 0.3s ease;
   background: #f8fafc;
+  min-width: 0;
 }
 
 [data-theme="dark"] .main-content {

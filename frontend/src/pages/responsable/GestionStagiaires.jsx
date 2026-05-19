@@ -180,8 +180,21 @@ export default function GestionStagiaires() {
     setShowModalId(true);
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
+
   const handleCreateDossier = async (e) => {
     e.preventDefault();
+
+    // Validation de la taille des fichiers côté client
+    if (cvFile && cvFile.size > MAX_FILE_SIZE) {
+      ClinisysAlert.error("Fichier trop volumineux", "Le CV dépasse la limite autorisée de 10 Mo.");
+      return;
+    }
+    if (portFile && portFile.size > MAX_FILE_SIZE) {
+      ClinisysAlert.error("Fichier trop volumineux", "Le portfolio dépasse la limite autorisée de 10 Mo.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     try {
@@ -204,7 +217,12 @@ export default function GestionStagiaires() {
       reloadDossiers(activeSession);
       ClinisysAlert.success("Dossier créé avec succès");
     } catch (err) {
-      ClinisysAlert.error("Erreur", err.response?.data?.message || "Erreur création dossier");
+      // Gestion spécifique de l'erreur de taille (Payload Too Large)
+      if (err.response?.status === 413) {
+        ClinisysAlert.error("Fichier trop lourd", "Le serveur a rejeté le fichier car il dépasse la taille maximale (10 Mo).");
+      } else {
+        ClinisysAlert.error("Erreur", err.response?.data?.message || "Une erreur est survenue lors de la création du dossier.");
+      }
     } finally {
       setSaving(false);
     }
